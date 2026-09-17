@@ -1,0 +1,178 @@
+{
+  "formatVersion": 1,
+  "roots": [
+    {
+      "key": "event:medical/case-change",
+      "kind": "event",
+      "event": "medical/case-change",
+      "surface": false,
+      "digest": "cc1bde316381efe4554dc83dcce118451d9b74c254575f59c44199db9c22e425",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "case",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "additionalNotes",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "age",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "caseId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "duration",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "symptoms",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              7
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "literal",
+            "value": "medical/case-change"
+          },
+          {
+            "kind": "union",
+            "types": [
+              11,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "create"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          },
+          {
+            "kind": "literal",
+            "value": true
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

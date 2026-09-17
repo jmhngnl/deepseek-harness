@@ -18,6 +18,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import GoalService from '@deepseek-ai/dsh-goal'
+import MedicalCaseService from '@deepseek-ai/dsh-medical-case'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
@@ -56,6 +57,9 @@ import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
+import * as ToolMedicalCaseIntake from '@deepseek-ai/dsh-tool-medical-case-intake'
+import * as ToolMedicalCaseUpdate from '@deepseek-ai/dsh-tool-medical-case-update'
+import * as ToolMedicalCaseGet from '@deepseek-ai/dsh-tool-medical-case-get'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
@@ -458,6 +462,48 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-medical-case-intake',
+    dir: 'tool-medical-case-intake',
+    source: 'packages/medical/tool-medical-case-intake/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.medicalCase'],
+    writes: ['tool/call', 'medical/case-change for accepted records', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(MedicalCaseService)
+      await ctx.plugin(ToolMedicalCaseIntake)
+    },
+    note:
+      'Structures the case basics a user volunteers (symptoms, duration, age, optional notes) and lists the required fields still missing. A call with no arguments is valid and reports every required field as missing; wrong argument types are ordinary tool errors. It performs no diagnosis, recommends no treatment or medication, and states no medical risk conclusion.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-medical-case-update',
+    dir: 'tool-medical-case-update',
+    source: 'packages/medical/tool-medical-case-update/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.medicalCase'],
+    writes: ['tool/call', 'medical/case-change for accepted changes', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(MedicalCaseService)
+      await ctx.plugin(ToolMedicalCaseUpdate)
+    },
+    note:
+      'Applies one incremental change to the session\u2019s recorded case. An omitted field keeps its value, and no parameter clears one: an empty symptom list or a blank string is rejected. symptoms cannot be combined with symptomsAdd or symptomsRemove, and one symptom cannot be both added and removed. A patch that changes nothing appends no event and keeps the revision.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-medical-case-get',
+    dir: 'tool-medical-case-get',
+    source: 'packages/medical/tool-medical-case-get/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.medicalCase'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(MedicalCaseService)
+      await ctx.plugin(ToolMedicalCaseGet)
+    },
+    note:
+      'Reads the session\u2019s authoritative case record and the required fields still missing, without changing either. The record comes from the durable session log rather than conversation memory, so it survives resume and fork. Fails when the session has recorded no case yet.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

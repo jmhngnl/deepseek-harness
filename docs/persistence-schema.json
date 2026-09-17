@@ -6080,6 +6080,178 @@
       }
     },
     {
+      "key": "event:medical/case-change",
+      "kind": "event",
+      "event": "medical/case-change",
+      "surface": false,
+      "digest": "cc1bde316381efe4554dc83dcce118451d9b74c254575f59c44199db9c22e425",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "case",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "additionalNotes",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "age",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "caseId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "duration",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "symptoms",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              7
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "literal",
+            "value": "medical/case-change"
+          },
+          {
+            "kind": "union",
+            "types": [
+              11,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "create"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          },
+          {
+            "kind": "literal",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
       "key": "event:model/selection",
       "kind": "event",
       "event": "model/selection",
@@ -28635,6 +28807,7 @@
       "names": [
         "event:compaction/end.data.turn",
         "event:compaction/start.data.turn",
+        "event:medical/case-change.data.case.age",
         "packages/core/session/src/types.ts#OptionalSessionSeq"
       ],
       "sources": [
@@ -32038,6 +32211,7 @@
         "packages/llm/llm/src/brand.ts#ProviderRequestId",
         "packages/llm/llm/src/brand.ts#ReasoningEffortId",
         "packages/llm/llm/src/brand.ts#ToolCallId",
+        "packages/medical/medical-case/src/types.ts#CaseId",
         "packages/schedule/schedule/src/types.ts#ScheduleId",
         "packages/session/session-title/src/index.ts#SessionTitleProviderId",
         "packages/session/session-title/src/types.ts#SessionTitleProviderId",
@@ -32063,6 +32237,7 @@
         "packages/llm/llm/src/brand.ts:31",
         "packages/llm/llm/src/brand.ts:43",
         "packages/llm/llm/src/brand.ts:67",
+        "packages/medical/medical-case/src/types.ts:14",
         "packages/schedule/schedule/src/types.ts:10",
         "packages/session/session-title/src/index.ts:42",
         "packages/session/session-title/src/types.ts:17",
@@ -35010,9 +35185,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39].sourceEventSeqs",
-        "SessionEventEnvelope[52].sourceEventSeqs",
-        "SessionEventEnvelope[55].sourceEventSeqs",
+        "SessionEventEnvelope[40].sourceEventSeqs",
+        "SessionEventEnvelope[53].sourceEventSeqs",
+        "SessionEventEnvelope[56].sourceEventSeqs",
         "event:assistant/attempt.data.stream[0][0].dt",
         "event:assistant/attempt.data.stream[0][1].dt",
         "event:assistant/attempt.data.stream[0][2].dt",
@@ -40074,6 +40249,34 @@
       ]
     },
     {
+      "digest": "799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:medical/case-change.data.case.additionalNotes",
+        "event:medical/case-change.data.case.duration"
+      ],
+      "sources": []
+    },
+    {
       "digest": "79ddc907312f97cf9553d4841e8b3fc937097bd8d97900a790efad3c05255e99",
       "schema": {
         "root": 0,
@@ -44144,6 +44347,7 @@
         "event:assistant/attempt.data.stream[0][0].texts",
         "event:assistant/attempt.data.stream[0][1].texts",
         "event:assistant/attempt.data.stream[0][2].args",
+        "event:medical/case-change.data.case.symptoms",
         "event:request/header.data.header.config.stop",
         "event:subagent/descriptor.data[1].toolFilter.allow",
         "event:subagent/descriptor.data[1].toolFilter.deny",
@@ -44479,9 +44683,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39]",
-        "SessionEventEnvelope[52]",
-        "SessionEventEnvelope[55]"
+        "SessionEventEnvelope[40]",
+        "SessionEventEnvelope[53]",
+        "SessionEventEnvelope[56]"
       ],
       "sources": []
     },
@@ -52780,6 +52984,20 @@
       ]
     },
     {
+      "digest": "c66c561db80e334d620372be95d2d893fe5931645317d6c961e001ae124faac4",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "update"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "c748fb42c80a120038a8c587af80ec39924803c401364db11c8974d5bf6d0262",
       "schema": {
         "root": 0,
@@ -54997,6 +55215,178 @@
       "sources": []
     },
     {
+      "digest": "cc1bde316381efe4554dc83dcce118451d9b74c254575f59c44199db9c22e425",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "case",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "additionalNotes",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "age",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "caseId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "duration",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "symptoms",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              7
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "literal",
+            "value": "medical/case-change"
+          },
+          {
+            "kind": "union",
+            "types": [
+              11,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "create"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          },
+          {
+            "kind": "literal",
+            "value": true
+          }
+        ]
+      },
+      "names": [
+        "event:medical/case-change"
+      ],
+      "sources": []
+    },
+    {
       "digest": "cd186c309e2bef305705e1d324139240f5e681f4f6a957d6a25b0225f65560df",
       "schema": {
         "root": 0,
@@ -56481,6 +56871,20 @@
           {
             "kind": "literal",
             "value": true
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "db381570d8f9310891c2752b654678792294df6d3bc7f410994405ada345ffd8",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "medical/case-change"
           }
         ]
       },
@@ -58441,8 +58845,8 @@
         "SessionEventEnvelope[36]",
         "SessionEventEnvelope[37]",
         "SessionEventEnvelope[38]",
+        "SessionEventEnvelope[39]",
         "SessionEventEnvelope[3]",
-        "SessionEventEnvelope[40]",
         "SessionEventEnvelope[41]",
         "SessionEventEnvelope[42]",
         "SessionEventEnvelope[43]",
@@ -58455,9 +58859,10 @@
         "SessionEventEnvelope[4]",
         "SessionEventEnvelope[50]",
         "SessionEventEnvelope[51]",
-        "SessionEventEnvelope[53]",
+        "SessionEventEnvelope[52]",
         "SessionEventEnvelope[54]",
-        "SessionEventEnvelope[56]",
+        "SessionEventEnvelope[55]",
+        "SessionEventEnvelope[57]",
         "SessionEventEnvelope[5]",
         "SessionEventEnvelope[7]",
         "SessionEventEnvelope[8]",
@@ -59483,6 +59888,96 @@
       "sources": []
     },
     {
+      "digest": "ee9aead2c84b7c32172bfd7e53f1f1105ed99cce0ead6a16665b6cd8c50a4266",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "additionalNotes",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "age",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "caseId",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "duration",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "symptoms",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              3
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              5
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          }
+        ]
+      },
+      "names": [
+        "packages/medical/medical-case/src/types.ts#CaseState"
+      ],
+      "sources": [
+        "packages/medical/medical-case/src/types.ts:39"
+      ]
+    },
+    {
       "digest": "eefbea819caeeea91ccb02dfafc16c68dd7f961cf9c1b2be25a2084509cf5c5a",
       "schema": {
         "root": 0,
@@ -59597,6 +60092,35 @@
       ],
       "sources": [
         "packages/api/session-controller/src/types.ts:86"
+      ]
+    },
+    {
+      "digest": "f10975b457a534221f41f840599daa11a82c4a44dcd764494afe647d96d6b26c",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "create"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          }
+        ]
+      },
+      "names": [
+        "packages/medical/medical-case/src/types.ts#CaseOperation"
+      ],
+      "sources": [
+        "packages/medical/medical-case/src/types.ts:32"
       ]
     },
     {
@@ -59791,6 +60315,147 @@
       ],
       "sources": [
         "packages/llm/llm/src/types.ts:97"
+      ]
+    },
+    {
+      "digest": "f2fa25489b7e07e8fcd982c80d9a087579a23cde01e6ad5c4ec66deb8e6d1834",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "case",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "additionalNotes",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "age",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "caseId",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "duration",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "symptoms",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              6
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "literal",
+            "value": "medical/case-change"
+          },
+          {
+            "kind": "union",
+            "types": [
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "create"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ]
+      },
+      "names": [
+        "packages/medical/medical-case/src/domain.ts#MedicalCaseChangeMeta",
+        "packages/medical/medical-case/src/domain.ts#MedicalCaseSnapshotChange"
+      ],
+      "sources": [
+        "packages/medical/medical-case/src/domain.ts:17",
+        "packages/medical/medical-case/src/domain.ts:29"
       ]
     },
     {

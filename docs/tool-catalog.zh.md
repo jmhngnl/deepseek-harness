@@ -37,6 +37,9 @@
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
+| `@deepseek-ai/dsh-tool-medical-case-intake` | `medical_case_intake` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`medical/case-change for accepted records`、`tool/result` | - | 把用户主动提供的病例基本信息（症状、病程、年龄、可选备注）记录进本会话的持久病例，并列出仍然缺失的必填字段。无参数调用合法，会把每个必填字段报告为缺失；参数类型错误只是普通工具错误。该工具不做诊断、不推荐治疗或药物，也不给出医学风险结论。 |
+| `@deepseek-ai/dsh-tool-medical-case-update` | `medical_case_update` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`medical/case-change for accepted changes`、`tool/result` | - | 对会话已记录的病例应用一次增量变更。省略的字段保持原值，且没有任何参数会清空字段：空症状列表与空白字符串都会被拒绝。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。没有造成任何变化的 patch 不追加事件，也不推进修订号。 |
+| `@deepseek-ai/dsh-tool-medical-case-get` | `medical_case_get` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`tool/result` | - | 只读地返回本会话的权威病例记录与仍然缺失的必填字段。记录来自持久会话日志而不是对话记忆，因此能跨恢复与 fork 存活。会话尚未记录病例时调用失败。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -1635,6 +1638,117 @@ create、edit、pause 和 resume 要求直接来自人类的根权限；complete
 来源：[`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。
+
+<a id="deepseek-aidsh-tool-medical-case-intake"></a>
+
+## `@deepseek-ai/dsh-tool-medical-case-intake`
+
+### `medical_case_intake`
+
+把用户提供的病例基本信息——症状、病程、年龄以及可选的附加备注——记录进本会话的持久病例，并报告哪些必填字段仍然缺失。用户首次描述病例时调用它；此后只有在用户重述已记录的事实时才再次调用。对于之后的每一次补充回答，例如新出现的症状或此前未给出的病程，应改用 medical_case_update。用户没有提到的字段请直接省略，不要发送空值或空白值。成功调用会返回权威记录；用户未提供的字段以 null 返回（症状则为空数组），并被列入 missingFields。应向用户追问 missingFields 中列出的字段，而不要自行猜测。该工具只做输入记录与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "symptoms": {
+      "type": "array",
+      "description": "Symptoms as the user described them. Pass an empty array or omit when the user has not named any.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "duration": {
+      "type": "string",
+      "description": "How long the symptoms have lasted, as the user phrased it (for example \"2 days\"). Omit when the user has not said."
+    },
+    "age": {
+      "type": "integer",
+      "description": "The patient’s age in whole years; 0 is valid for an infant under one year. Omit when the user has not said. Values outside 0–130 are rejected."
+    },
+    "additionalNotes": {
+      "type": "string",
+      "description": "Any other case context the user volunteered. Optional: omitting it never counts as missing information."
+    }
+  }
+}
+```
+
+来源：[`packages/medical/tool-medical-case-intake/src/index.ts`](../packages/medical/tool-medical-case-intake/src/index.ts)
+
+把用户主动提供的病例基本信息（症状、病程、年龄、可选备注）记录进本会话的持久病例，并列出仍然缺失的必填字段。无参数调用合法，会把每个必填字段报告为缺失；参数类型错误只是普通工具错误。该工具不做诊断、不推荐治疗或药物，也不给出医学风险结论。
+
+<a id="deepseek-aidsh-tool-medical-case-update"></a>
+
+## `@deepseek-ai/dsh-tool-medical-case-update`
+
+### `medical_case_update`
+
+对会话已记录的病例应用一次增量变更。病例建立之后，用户给出的每一次补充都应使用它：新症状、病程、年龄或额外备注。省略的字段会保持已记录的值，因此只发送用户刚刚说过的内容。症状方面，优先用 symptomsAdd 表达"还有……"，用 symptomsRemove 更正此前的记录；只有在用户重述完整清单时才传 symptoms。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。绝不要用空白或空值去擦除内容：本工具不清空已记录的事实。调用会返回变更后的权威记录，missingFields 会告诉你下一步该追问什么。该工具只做输入记录与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "symptoms": {
+      "type": "array",
+      "description": "Replace the whole symptom list. Use only when the user restates the complete list; it cannot be combined with symptomsAdd or symptomsRemove, and an empty list is rejected.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "symptomsAdd": {
+      "type": "array",
+      "description": "Symptoms to append, keeping the ones already recorded. Use this for \"also ...\". Entries are trimmed, blanks dropped, and exact repeats ignored.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "symptomsRemove": {
+      "type": "array",
+      "description": "Symptoms to drop, for correcting an earlier record. A symptom that is not recorded is ignored. One symptom cannot appear in both symptomsAdd and symptomsRemove.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "duration": {
+      "type": "string",
+      "description": "Replacement duration text, as the user phrased it. Omit to keep the recorded value; a blank string is rejected."
+    },
+    "age": {
+      "type": "integer",
+      "description": "Replacement patient age in whole years; 0 is valid for an infant under one year. Omit to keep the recorded value. Values outside 0–130 are rejected."
+    },
+    "additionalNotes": {
+      "type": "string",
+      "description": "Replacement optional notes. Omit to keep the recorded value; a blank string is rejected."
+    }
+  }
+}
+```
+
+来源：[`packages/medical/tool-medical-case-update/src/index.ts`](../packages/medical/tool-medical-case-update/src/index.ts)
+
+对会话已记录的病例应用一次增量变更。省略的字段保持原值，且没有任何参数会清空字段：空症状列表与空白字符串都会被拒绝。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。没有造成任何变化的 patch 不追加事件，也不推进修订号。
+
+<a id="deepseek-aidsh-tool-medical-case-get"></a>
+
+## `@deepseek-ai/dsh-tool-medical-case-get`
+
+### `medical_case_get`
+
+只读地读取本会话已记录的病例，不做任何变更。用它重新核对权威事实与仍然缺失的字段——例如一段长对话之后、记录被更新之后，或任何时候你不确定究竟记录了什么。返回的记录是权威的：它来自会话的持久病例状态，而不是对话记忆。当本会话尚未记录病例时调用会失败；应先用 medical_case_intake 记录一份。该工具只做读取与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/medical/tool-medical-case-get/src/index.ts`](../packages/medical/tool-medical-case-get/src/index.ts)
+
+只读地返回本会话的权威病例记录与仍然缺失的必填字段。记录来自持久会话日志而不是对话记忆，因此能跨恢复与 fork 存活。会话尚未记录病例时调用失败。
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

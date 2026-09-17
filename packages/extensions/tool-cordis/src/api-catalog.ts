@@ -1310,6 +1310,47 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'medicalCase',
+    summary: 'The medical intake case service (`ctx.medicalCase`), backed exclusively by the owning session log.',
+    description: 'The medical intake case service (`ctx.medicalCase`), backed exclusively by the owning session log. Every mutation appends a full-state `medical/case-change` event and returns the resulting authoritative view; a mutation that would change nothing appends no event and keeps the revision.',
+    methods: [
+      {
+        signature: 'get(agent: Agent): CaseView | undefined',
+        description: 'Read the current case for one exact live agent.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'a fresh view, or `undefined` when no case has been recorded.',
+        throws: ['{@link MedicalCaseError} when the agent is not the registry\'s live instance.'],
+      },
+      {
+        signature: 'require(agent: Agent): CaseView',
+        description: 'Read the current case, failing when this session has none.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'a fresh view.',
+        throws: ['{@link MedicalCaseError} when no case exists or the agent is not live.'],
+      },
+      {
+        signature: 'create(agent: Agent, request: CaseIntakeRequest): CaseUpdateResult',
+        description: 'Record the first-contact case for one exact live agent.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'the facts the user has volunteered so far; any may be omitted.' }],
+        returns: 'the created view at revision one.',
+        throws: ['{@link MedicalCaseError} when a case already exists.'],
+      },
+      {
+        signature: 'intake(agent: Agent, request: CaseIntakeRequest): CaseUpdateResult',
+        description: 'Record what the user just described. Creates the case when the session has none, and otherwise treats the request as a restatement of the record.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'the facts the user volunteered in this message.' }],
+        returns: 'the authoritative view and whether it changed.',
+      },
+      {
+        signature: 'applyPatch(agent: Agent, patch: CasePatch): CaseUpdateResult',
+        description: 'Apply one incremental patch to the current case.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'patch', description: 'the change; an omitted field keeps its recorded value.' }],
+        returns: 'the authoritative view and whether it changed.',
+        throws: ['{@link MedicalCaseError} when no case exists or the patch is invalid.'],
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Session-log service; cold operations never construct a Session or Agent.',
     description: 'Session-log service; cold operations never construct a Session or Agent.',
@@ -3967,6 +4008,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BrowserUseProviderName = Branded<\'BrowserUseProviderName\'>;',
   },
   {
+    name: 'CaseId',
+    declaration: 'export type CaseId = Branded<\'CaseId\'>;',
+  },
+  {
+    name: 'CaseIntakeRequest',
+    declaration: 'export interface CaseIntakeRequest {\n    readonly symptoms?: string[];\n    readonly duration?: string;\n    readonly age?: number;\n    readonly additionalNotes?: string;\n}',
+  },
+  {
+    name: 'CasePatch',
+    declaration: 'export interface CasePatch {\n    readonly symptoms?: string[];\n    readonly symptomsAdd?: string[];\n    readonly symptomsRemove?: string[];\n    readonly duration?: string;\n    readonly age?: number;\n    readonly additionalNotes?: string;\n}',
+  },
+  {
+    name: 'CaseRef',
+    declaration: 'export interface CaseRef {\n    readonly caseId: CaseId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'CaseState',
+    declaration: 'export interface CaseState extends CaseRef {\n    readonly symptoms: string[];\n    readonly duration: string | null;\n    readonly age: number | null;\n    readonly additionalNotes: string | null;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
+  },
+  {
+    name: 'CaseUpdateResult',
+    declaration: 'export interface CaseUpdateResult {\n    readonly view: CaseView;\n    readonly changed: boolean;\n}',
+  },
+  {
+    name: 'CaseView',
+    declaration: 'export interface CaseView extends CaseState {\n    readonly missingFields: MissingField[];\n}',
+  },
+  {
     name: 'ClientArtifactBaseline',
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly size: number;\n}',
   },
@@ -4837,6 +4906,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'MessageSourceMap',
     declaration: 'export interface MessageSourceMap {\n    user: {\n        kind: \'user\';\n    };\n    plugin: {\n        kind: \'plugin\';\n        plugin: string;\n    } & ContextFormed;\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n}',
+  },
+  {
+    name: 'MissingField',
+    declaration: 'export type MissingField = \'symptoms\' | \'duration\' | \'age\';',
   },
   {
     name: 'ModelCatalog',
