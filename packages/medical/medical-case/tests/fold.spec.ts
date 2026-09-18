@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { decodeMedicalCaseChange, applyMedicalCaseChange, applyMedicalCaseEvent, emptyMedicalCaseFoldState, foldMedicalCase } from '../src/fold.ts'
 import type { MedicalCaseFoldState } from '../src/fold.ts'
 import type { MedicalCaseChangeMeta } from '../src/domain.ts'
@@ -187,14 +187,15 @@ describe('applyMedicalCaseChange', () => {
 describe('applyMedicalCaseEvent', () => {
   it('ignores an event belonging to another domain', () => {
     const state = emptyMedicalCaseFoldState()
-    applyMedicalCaseEvent(state, { type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } } as never)
+    const unrelated: SessionEvent = { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } }
+    applyMedicalCaseEvent(state, unrelated)
     expect(state.current).toBeUndefined()
     expect([...state.seenCaseIds]).toEqual([])
   })
 
   it('applies this domain\u2019s committed event', () => {
     const state = emptyMedicalCaseFoldState()
-    const event = { type: 'medical/case-change', seq: 1, time: 1, data: change() } as never
+    const event: SessionEvent = { type: 'medical/case-change', seq: SessionSeq(1), time: 1, data: change() }
     applyMedicalCaseEvent(state, event)
     expect(state.current).toEqual(record())
   })
@@ -206,11 +207,11 @@ describe('foldMedicalCase', () => {
   })
 
   it('replays the whole case history from the log alone', () => {
-    const events = [
-      { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
-      { type: 'medical/case-change', seq: 1, time: 1, data: change() },
-      { type: 'medical/case-change', seq: 2, time: 2, data: change({ revision: 2, age: 26, updatedAt: 2_000 }, 'update') },
-    ] as readonly SessionEvent[]
+    const events: readonly SessionEvent[] = [
+      { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+      { type: 'medical/case-change', seq: SessionSeq(1), time: 1, data: change() },
+      { type: 'medical/case-change', seq: SessionSeq(2), time: 2, data: change({ revision: 2, age: 26, updatedAt: 2_000 }, 'update') },
+    ]
     const folded = foldMedicalCase(events)
     expect(folded.current).toEqual(record({ revision: 2, age: 26, updatedAt: 2_000 }))
     expect(folded.lastRef).toEqual({ caseId: CASE_ID, revision: 2 })
@@ -218,10 +219,10 @@ describe('foldMedicalCase', () => {
   })
 
   it('stops at the first malformed record instead of skipping it', () => {
-    const events = [
-      { type: 'medical/case-change', seq: 1, time: 1, data: change() },
-      { type: 'medical/case-change', seq: 2, time: 2, data: change({ revision: 4, age: 26, updatedAt: 2_000 }, 'update') },
-    ] as readonly SessionEvent[]
+    const events: readonly SessionEvent[] = [
+      { type: 'medical/case-change', seq: SessionSeq(1), time: 1, data: change() },
+      { type: 'medical/case-change', seq: SessionSeq(2), time: 2, data: change({ revision: 4, age: 26, updatedAt: 2_000 }, 'update') },
+    ]
     expect(() => foldMedicalCase(events)).toThrow(/advance the current case by one revision/)
   })
 })
