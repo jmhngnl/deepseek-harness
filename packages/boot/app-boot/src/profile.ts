@@ -157,6 +157,28 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
     bundles: ['@deepseek-ai/dsh-sdk-minimal'],
     patchReload: 'startup',
   },
+  // The medical intake agent. `dsh-medharness` is standalone like `sdk-minimal`
+  // and owns the whole composition; `dsh-headless` sits on top of it for the
+  // one-shot task runner and the `--session-id` / `--json` options. It is listed
+  // FIRST so the medical bundle is the later layer: base-backed mode bundles
+  // restate `system-prompt` and `tools` wholesale, and a medical profile wants
+  // neither the coding-agent persona nor an environment-selected tool mode.
+  medharness: {
+    bundles: ['@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-medharness'],
+    patchReload: 'startup',
+  },
+  // The same medical runtime under the Web surface. It is base-backed on
+  // purpose: `dsh-web-app` patches base rows by id (`tool-bash`, `system-prompt`,
+  // `session-query-sqlite`, ...) and inserts the whole client/Host stack, so it
+  // expects a base-backed tree. That costs nothing here, because the Web profile
+  // disables the host plane's coding rows and governs each agent's tools by its
+  // preset — the `medical` preset in `dsh-agent-presets` is what a Web medical
+  // session sees. `dsh-medharness` is last so its persona and medical rows are
+  // the final word over the mode bundle's rows.
+  'medharness-web': {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-medharness'],
+    patchReload: 'live',
+  },
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */

@@ -1,0 +1,199 @@
+# The MedHarness bundle patch: the standalone composition of the medical intake
+# agent, applied as ONE insert over the empty profile root.
+#
+# This is NOT `dsh-base` with rows switched off. `dsh-base` is the shared core of
+# a *coding* agent — a shell, a filesystem, background jobs, goals, todos, plan
+# mode, subagents, workflows, skills, web search, telemetry — and a medical
+# intake uses none of it. Composing subtractively would still install, resolve,
+# and version every one of those packages. This file lists what the agent needs
+# and nothing else, the way `packages/bundle/sdk-minimal` does.
+#
+# What is deliberately absent, and why it is not "forgotten":
+#
+#   * every model-facing coding tool (shell, filesystem, jobs, goals, todos,
+#     plan mode, subagents, workflows, Ralph, skills, web);
+#   * `session-telemetry-otel`. The subject matter is clinical and the runtime
+#     must not be able to export it. A profile that does not mount the row cannot
+#     export, which is a stronger guarantee than `DSH_TELEMETRY_DISABLED`: that
+#     switch is applied by the launcher as a patch, `config` cannot disable a row,
+#     and `patchReload: startup` freezes the tree at boot. `resolveTelemetryPatch`
+#     treats a composition without the row as trivially satisfied, so the switch
+#     stays valid and simply has nothing to target.
+#   * `feedback`, `message-feedback`, `command-feedback`. User feedback is a
+#     Phase 3 evaluation input; the source stays in the repository, the runtime
+#     does not mount it until something consumes it.
+#   * `agent-instructions`, which would feed this repository's `AGENTS.md` into a
+#     medical conversation's prompt.
+#   * `mcp-resources`. External tools are a later phase, and an unconfigured MCP
+#     surface only widens the request.
+#   * `user-questions`. It registers `ask_user_question`, and the medical
+#     surface is exactly three tools. The tools already report their missing
+#     fields, which is how the agent asks.
+#
+# Rows are ordered for readers, not for activation: activation is driven by
+# service availability, so the loader settles the real order. Every row here is a
+# package this bundle declares in `package.json` — that declaration is what puts
+# the medical packages into the installation's module-fallback closure and makes
+# the bare specifiers below resolvable at all.
+
+- insert:
+    # ── Runtime scaffolding ──────────────────────────────────────────────────
+    - id: timer
+      name: '@deepseek-ai/cordis-plugin-timer'
+
+    - id: llm
+      name: '@deepseek-ai/dsh-llm'
+
+    - id: deepseek-llm-api-extensions
+      name: '@deepseek-ai/dsh-deepseek-llm-api-extensions'
+
+    # The native DeepSeek adapter. The key and endpoint are not inlined: both
+    # resolve per request from the `llm-deepseek:` settings section over this
+    # entry, with the key coming from the credential store below.
+    - id: llm-deepseek
+      name: '@deepseek-ai/dsh-llm-deepseek'
+
+    - id: llm-retry
+      name: '@deepseek-ai/dsh-llm-retry'
+
+    # User-settings document (`$DSH_HOME/settings.yaml`, hot-reloaded) and the
+    # credential sources that resolve references per request.
+    - id: settings
+      name: '@deepseek-ai/dsh-settings-file'
+
+    - id: credentials
+      name: '@deepseek-ai/dsh-credentials-local'
+
+    # The model an entry point uses when it creates an Agent without naming one.
+    - id: agent-default-model
+      name: '@deepseek-ai/dsh-agent-default-model'
+      config:
+        provider: deepseek-official
+        model: deepseek-flash
+
+    # Resolves each active entry's package for the request's `dsh_plugin_packages`
+    # report. It is the reader that decides whether a bare specifier is usable
+    # here at all: it resolves through Node's `node_modules`, so a package this
+    # bundle does not declare is one it cannot report.
+    - id: plugin-package-inventory-deepseek
+      name: '@deepseek-ai/dsh-plugin-package-inventory-deepseek'
+
+    # ── Session, projection, persistence ─────────────────────────────────────
+    - id: session
+      name: '@deepseek-ai/dsh-session'
+
+    - id: session-log-deepseek
+      name: '@deepseek-ai/dsh-session-log-deepseek'
+
+    - id: session-persistence-jsonl
+      name: '@deepseek-ai/dsh-session-persistence-jsonl'
+      config:
+        root: !!js dshHomePath('sessions')
+
+    # The projection registry the medical domain folds through. The case read
+    # model is a registered projection, so persistence, resume, and
+    # fork-inheritance all come from the session log rather than a second store.
+    - id: session-projection
+      name: '@deepseek-ai/dsh-session-projection'
+
+    - id: session-projection-cache
+      name: '@deepseek-ai/dsh-session-projection-cache'
+      config:
+        writeEveryEvents: 200
+        writeIntervalMs: 5000
+
+    - id: storage
+      name: '@deepseek-ai/dsh-storage'
+
+    - id: storage-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: !!js dshHomePath('storages')
+
+    - id: storage-domain
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+
+    # Durable image bytes live outside the append-only session log. Kept for the
+    # roadmap's medical imaging and VLM work, and for a session carrying an image
+    # reference today.
+    - id: attachment-local
+      name: '@deepseek-ai/dsh-attachment-local'
+
+    # ── Process confinement and the filesystem provider ──────────────────────
+    #
+    # These register no tool. They are the infrastructure the rest of the tree
+    # injects, and the criterion from the previous round holds: a row another row
+    # injects is not a model-facing surface. `fs-sandbox` is the filesystem
+    # provider that `attachment-local` reads through; the sandbox pair is the
+    # implementation of the abstract `shell` service, which stays because
+    # `permission-presets` injects it.
+    - id: subprocess
+      name: '@deepseek-ai/dsh-subprocess-local'
+
+    - id: sandbox
+      name: '@deepseek-ai/dsh-sandbox-local'
+
+    - id: sandbox-policy
+      name: '@deepseek-ai/dsh-sandbox-policy'
+      config:
+        mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
+        workspaceRoot: !!js process.cwd()
+
+    - id: fs-sandbox
+      name: '@deepseek-ai/dsh-fs-sandbox'
+
+    # ── Agent loop and the tool registry ────────────────────────────────────
+    - id: tools
+      name: '@deepseek-ai/dsh-tools'
+      config:
+        # Pinned rather than read from the environment: `ptc` mode replaces every
+        # registered schema with a single `run_code` tool, which would both widen
+        # the surface and hide the medical tools.
+        mode: native
+
+    - id: system-prompt
+      name: '@deepseek-ai/dsh-system-prompt'
+      config:
+        personaPrefix: >-
+          You are a medical intake assistant powered by the {{model}} model.
+        personaSuffix: >-
+          You record the facts a user states about their case and ask for whatever is still missing.
+          You do not diagnose, prescribe, or assess risk, and you never state a medical conclusion.
+
+    - id: agent
+      name: '@deepseek-ai/dsh-agent'
+
+    - id: agent-loop
+      name: '@deepseek-ai/dsh-agent-loop'
+      config:
+        agents: []
+
+    # ── The medical domain ──────────────────────────────────────────────────
+    #
+    # The session-backed case domain. It owns the durable `medical/case-change`
+    # session event and the host-only `medicalCase` projection, and registers
+    # `ctx.medicalCase`. Mounted before its consumers; each consumer declares the
+    # service in `inject`, so the loader settles the order regardless.
+    - id: medical-case
+      name: '@deepseek-ai/dsh-medical-case'
+
+    # Records the case basics a user volunteers (symptoms, duration, age, optional
+    # notes) and reports which required fields are still missing. It performs no
+    # diagnosis, no treatment or medication recommendation, and no risk
+    # assessment — it exists so the agent asks for missing facts instead of
+    # inventing them.
+    - id: tool-medical-case-intake
+      name: '@deepseek-ai/dsh-tool-medical-case-intake'
+
+    # Applies one incremental change to the recorded case. An omitted field keeps
+    # its value and no parameter clears one, so a follow-up answer cannot erase
+    # what is already recorded.
+    - id: tool-medical-case-update
+      name: '@deepseek-ai/dsh-tool-medical-case-update'
+
+    # Reads the authoritative case record back without changing it, so the agent
+    # consults durable session state instead of its conversation history.
+    - id: tool-medical-case-get
+      name: '@deepseek-ai/dsh-tool-medical-case-get'
