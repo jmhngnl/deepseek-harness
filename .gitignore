@@ -45,4 +45,5 @@ worktrees/
 .typert-*/
 native/system/test/bin/
 /.workbuddy/
+/.workbuddy-ai/
 /_tmp_*/
