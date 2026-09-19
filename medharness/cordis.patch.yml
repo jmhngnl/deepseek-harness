@@ -24,6 +24,14 @@
 #    three model-facing tools that consume it. These are additive: the shipped
 #    bundles carry no medical package.
 #
+# What this overlay does NOT do is decide a Web session's tool list. The Web
+# profile already disables the host-plane tool rows and re-supplies tools per
+# agent from `packages/preset/agent-presets`, so a Web session's surface comes
+# from its preset. A medical preset — `presets/medical/agent.cordis.yml` listing
+# only the three rows below — is the Web-side counterpart of this file, and there
+# is none yet. The headless profile has no preset realm, so here the disabled
+# rows are the whole surface.
+#
 # Keeping both in this overlay — rather than editing
 # `packages/bundle/base/cordis.patch.yml` — is what lets the fork run on the
 # frozen `medharness-base-20260915` baseline with zero changes to Harness core

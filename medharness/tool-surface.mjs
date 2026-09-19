@@ -87,6 +87,14 @@ function composeProfile(profileName) {
 }
 
 // ── Composition assertions, on every profile the overlay is applied to ──────
+//
+// These assertions are about ROWS, and rows are what this overlay owns. They are
+// NOT a claim about a Web session's tool list: the Web profile disables the
+// host-plane tool rows and re-supplies tools per agent from
+// `packages/preset/agent-presets`, so a Web session's surface is decided by its
+// preset. There is no medical preset today, so the `web` result below says the
+// host plane is clean — not that a Web session sees three tools. The headless
+// surface is measured end to end instead, by `--measure` below.
 
 for (const profileName of ['headless', 'web']) {
   const { byId, layers } = composeProfile(profileName)
