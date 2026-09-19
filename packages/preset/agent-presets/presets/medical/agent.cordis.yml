@@ -1,0 +1,49 @@
+# The `medical` agent preset: a medical intake agent whose entire tool surface is
+# the three case tools.
+#
+# A preset decides an agent's model-facing tools in a profile that governs tools
+# per agent rather than per host — which is what the Web profile does. There the
+# host plane's coding rows are already disabled
+# (`packages/bundle/web-app/cordis.patch.yml`) and each agent's catalog comes
+# from the preset it is mounted under, so this file, not a bundle layer, is what
+# a Web medical session actually sees.
+#
+# The domain is NOT mounted here. `ctx.medicalCase` is a host service and belongs
+# to the layer that owns the profile; this preset assumes a composition that
+# mounts `@deepseek-ai/dsh-medical-case` (the `medharness` bundle does). Mounting
+# it in both places would register the projection twice for one session.
+#
+# What is absent is the point: no shell, no filesystem, no background jobs, no
+# goals, no todos, no plan mode, no subagents, no workflows, no skills, no web
+# search, and no `ask_user_question`. The intake and update tools already report
+# which required facts are still missing, which is how this agent asks.
+
+# The persona is the complete system prompt, so global identity, Web orientation,
+# and tool guidance cannot add prompt text about capabilities this agent does not
+# have. Runtime context snapshots are suppressed for the same reason: there is no
+# working directory to report.
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: >-
+      You are a medical intake assistant. You record the facts a user states about their case and ask
+      for whatever is still missing. You do not diagnose, prescribe, or assess risk, and you never
+      state a medical conclusion. Record only what the user tells you; never invent a fact, a value,
+      or a measurement, and never guess at a fact the tools report as missing.
+    complete: true
+    includeRuntimeContext: false
+
+# Records the case basics the user volunteers (symptoms, duration, age, optional
+# notes) and reports the required fields still missing.
+- id: tool-medical-case-intake
+  name: '@deepseek-ai/dsh-tool-medical-case-intake'
+
+# Applies one incremental change. An omitted field keeps its value and no
+# parameter clears one, so a follow-up answer cannot erase what is recorded.
+- id: tool-medical-case-update
+  name: '@deepseek-ai/dsh-tool-medical-case-update'
+
+# Reads the authoritative record back without changing it, so the agent consults
+# durable session state rather than its conversation history.
+- id: tool-medical-case-get
+  name: '@deepseek-ai/dsh-tool-medical-case-get'

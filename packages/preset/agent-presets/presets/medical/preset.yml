@@ -1,0 +1,3 @@
+name: 医疗接诊
+description: 仅记录与更新病例事实的医疗接诊 Agent，不提供任何代码执行、文件或网络工具。
+order: 4
