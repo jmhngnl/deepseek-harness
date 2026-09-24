@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-medical-case",
-  "description": "Session-backed medical intake case domain: durable case state, strict replay, and compare-and-set revisions",
+  "description": "Session-backed medical intake case domain: durable case state, strict replay, and a monotonic revision",
   "version": "0.1.6-alpha.1",
   "publishConfig": {
     "access": "public"

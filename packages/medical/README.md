@@ -24,7 +24,7 @@ The medical group holds domain capabilities for medical consultation and intake 
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`medical-case`](medical-case/README.md) | One durable case per session: create, restate, patch, strict replay, and compare-and-set revisions | `ctx.medicalCase` |
+| [`medical-case`](medical-case/README.md) | One durable case per session: create, restate, patch, strict replay, and a monotonic revision | `ctx.medicalCase` |
 | [`tool-medical-case-intake`](tool-medical-case-intake/README.md) | Records the case on first contact and reports the required fields still missing | registers on `ctx.tools` |
 | [`tool-medical-case-update`](tool-medical-case-update/README.md) | Applies one incremental change to the recorded case, never clearing a field silently | registers on `ctx.tools` |
 | [`tool-medical-case-get`](tool-medical-case-get/README.md) | Reads the authoritative case and the facts still missing, without changing either | registers on `ctx.tools` |

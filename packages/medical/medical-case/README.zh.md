@@ -1,5 +1,5 @@
 ---
-description: "会话内医疗接诊病例领域：持久病例状态、严格回放、比较并交换修订，以及派生的缺失字段报告。"
+description: "会话内医疗接诊病例领域：持久病例状态、严格回放、单调递增修订，以及派生的缺失字段报告。"
 kind: "package-reference"
 ---
 
@@ -110,7 +110,7 @@ const completed = ctx.medicalCase.applyPatch(agent, { duration: '2 days', age: 2
 - [医疗接诊病例子系统](../../../docs/subsystems/medical-case.zh.md)——确切字段、变体与服务行为。
 - [会话投影](../../session/session-projection/README.zh.md)——驱动折叠并提供逐会话 cell 的注册表。
 - [持久化子系统](../../../docs/subsystems/persistence.zh.md)——本领域存放记录所用的会话日志。
-- [同会话目标领域](../../goal/goal/README.zh.md)——本包遵循的同类模式：带比较并交换修订的事件溯源会话内状态。
+- [同会话目标领域](../../goal/goal/README.zh.md)——本包遵循的同类模式：其单调递增修订由严格回放守卫的事件溯源会话内状态。
 - [医疗分组地图](../README.zh.md)——本领域所服务的兄弟包。
 
 -----

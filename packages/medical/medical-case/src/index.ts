@@ -1,7 +1,7 @@
 /**
  * Session-backed medical intake case domain: durable case state carried by the
- * owning session log, compare-and-set revisions, and the strict projection the
- * registry drives on every committed event.
+ * owning session log, a monotonic revision guarded by replay consistency, and
+ * the strict projection the registry drives on every committed event.
  *
  * The domain owns the contract only. Durability, resume, and fork inheritance
  * are the harness session log's business (`dsh-session`), and the per-session

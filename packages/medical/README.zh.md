@@ -24,7 +24,7 @@ medical 组承载构建在 harness 之上的医疗咨询与辅助分诊领域能
 
 | 包 | 职责 | ctx 键 |
 |---|---|---|
-| [`medical-case`](medical-case/README.zh.md) | 每会话一个持久病例：创建、重述、增量变更、严格回放与比较并交换修订号 | `ctx.medicalCase` |
+| [`medical-case`](medical-case/README.zh.md) | 每会话一个持久病例：创建、重述、增量变更、严格回放与单调递增修订号 | `ctx.medicalCase` |
 | [`tool-medical-case-intake`](tool-medical-case-intake/README.zh.md) | 首次联系时记录病例，并报告仍然缺失的必填字段 | 注册到 `ctx.tools` |
 | [`tool-medical-case-update`](tool-medical-case-update/README.zh.md) | 对已记录病例应用一次增量变更，绝不静默清空字段 | 注册到 `ctx.tools` |
 | [`tool-medical-case-get`](tool-medical-case-get/README.zh.md) | 只读地读回权威病例与仍然缺失的字段 | 注册到 `ctx.tools` |

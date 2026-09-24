@@ -1,5 +1,5 @@
 ---
-description: "The session-backed medical intake case domain: durable case state, strict replay, compare-and-set revisions, and the derived missing-field report."
+description: "The session-backed medical intake case domain: durable case state, strict replay, a monotonic revision, and the derived missing-field report."
 kind: "package-reference"
 ---
 
@@ -110,7 +110,7 @@ Only the service reads a clock, and it clamps the result to at least the previou
 - [Medical case subsystem](../../../docs/subsystems/medical-case.md) — the exact fields, variants, and service behavior.
 - [Session projection](../../session/session-projection/README.md) — the registry that drives the fold and serves the per-session cell.
 - [Persistence subsystem](../../../docs/subsystems/persistence.md) — the session log this domain stores its records in.
-- [Same-session goal domain](../../goal/goal/README.md) — the sibling pattern this package follows: event-sourced per-session state with compare-and-set revisions.
+- [Same-session goal domain](../../goal/goal/README.md) — the sibling pattern this package follows: event-sourced per-session state whose monotonic revision is guarded by strict replay.
 - [Medical group map](../README.md) — the sibling packages this domain serves.
 
 -----
