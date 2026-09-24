@@ -383,6 +383,7 @@
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
     { "path": "./packages/medical/medical-case" },
+    { "path": "./packages/medical/medical-eval" },
     { "path": "./packages/medical/tool-medical-case-get" },
     { "path": "./packages/medical/tool-medical-case-intake" },
     { "path": "./packages/medical/tool-medical-case-update" },

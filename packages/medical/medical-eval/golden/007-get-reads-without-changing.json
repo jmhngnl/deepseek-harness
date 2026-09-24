@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "get-reads-without-changing",
+  "description": "Asking what the record holds is answered by reading it: the revision and the durable log are exactly as the previous turn left them, so a question never counts as a change.",
+  "turns": [
+    {
+      "user": "我25岁，头疼发烧两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    },
+    {
+      "user": "现在病例里都记了什么？",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_get"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": false,
+          "eventCountDelta": 0
+        }
+      }
+    }
+  ]
+}

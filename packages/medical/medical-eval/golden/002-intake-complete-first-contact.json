@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "intake-complete-first-contact",
+  "description": "A first contact carrying every required fact records the case in one call and reports nothing missing.",
+  "turns": [
+    {
+      "user": "我25岁，头疼发烧两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake",
+              "arguments": {
+                "symptoms": ["头疼", "发烧"],
+                "age": 25
+              }
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    }
+  ]
+}

@@ -8288,6 +8288,51 @@ importers:
         specifier: workspace:^
         version: link:../../session/session-projection
 
+  packages/medical/medical-eval:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-medical-case':
+        specifier: workspace:^
+        version: link:../medical-case
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-medical-case-get':
+        specifier: workspace:^
+        version: link:../tool-medical-case-get
+      '@deepseek-ai/dsh-tool-medical-case-intake':
+        specifier: workspace:^
+        version: link:../tool-medical-case-intake
+      '@deepseek-ai/dsh-tool-medical-case-update':
+        specifier: workspace:^
+        version: link:../tool-medical-case-update
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:^
+        version: link:../../util/values
+
   packages/medical/tool-medical-case-get:
     devDependencies:
       '@deepseek-ai/cordis':

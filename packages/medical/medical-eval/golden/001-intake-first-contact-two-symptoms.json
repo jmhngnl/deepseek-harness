@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "intake-first-contact-two-symptoms",
+  "description": "A first contact that names two symptoms opens the case and reports the two required facts still missing, without inventing a duration or an age.",
+  "turns": [
+    {
+      "user": "我头疼、发烧",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake",
+              "arguments": {
+                "symptoms": ["头疼", "发烧"]
+              }
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": null,
+          "age": null,
+          "revision": 1,
+          "missingFields": ["duration", "age"]
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    }
+  ]
+}

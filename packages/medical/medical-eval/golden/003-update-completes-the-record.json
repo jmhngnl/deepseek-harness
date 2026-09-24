@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "update-completes-the-record",
+  "description": "A follow-up that supplies the facts the first contact left open completes the same case at a second revision instead of opening another.",
+  "turns": [
+    {
+      "user": "我头疼、发烧",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": null,
+          "age": null,
+          "revision": 1,
+          "missingFields": ["duration", "age"]
+        },
+        "mutation": {
+          "operations": ["create"]
+        }
+      }
+    },
+    {
+      "user": "25岁，两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_update",
+              "arguments": {
+                "age": 25
+              }
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 2,
+          "missingFields": []
+        },
+        "mutation": {
+          "operations": ["update"]
+        }
+      }
+    }
+  ]
+}

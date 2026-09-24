@@ -47,3 +47,7 @@ native/system/test/bin/
 /.workbuddy/
 /.workbuddy-ai/
 /_tmp_*/
+# Local evaluation reports. Only the directory the harness writes runs into is
+# ignored: the rest of `.medharness/` may hold configuration and manifests that
+# belong in history.
+/.medharness/eval-runs/

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "update-corrects-the-age",
+  "description": "Correcting the recorded age advances the revision and leaves every other fact, including the recorded duration, untouched.",
+  "turns": [
+    {
+      "user": "我25岁，头疼发烧两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    },
+    {
+      "user": "刚才年龄说错了，我26岁",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_update",
+              "arguments": {
+                "age": 26
+              }
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 26,
+          "revision": 2,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    }
+  ]
+}

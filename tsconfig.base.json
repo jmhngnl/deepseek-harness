@@ -355,6 +355,7 @@
       "@deepseek-ai/dsh-mcp-resources": ["./packages/mcp/mcp-resources/src"],
       "@deepseek-ai/dsh-medharness": ["./packages/bundle/medharness/src"],
       "@deepseek-ai/dsh-medical-case": ["./packages/medical/medical-case/src"],
+      "@deepseek-ai/dsh-medical-eval": ["./packages/medical/medical-eval/src"],
       "@deepseek-ai/dsh-message-feedback": ["./packages/feedback/message-feedback/src"],
       "@deepseek-ai/dsh-native-command": ["./packages/util/native-command/src"],
       "@deepseek-ai/dsh-output-retention": ["./packages/util/output-retention/src"],

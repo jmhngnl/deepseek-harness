@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "update-adds-a-symptom",
+  "description": "A newly mentioned symptom is appended to the recorded list, which keeps every symptom the case already held.",
+  "turns": [
+    {
+      "user": "我25岁，头疼发烧两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    },
+    {
+      "user": "还有点恶心",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_update"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧", "恶心"],
+          "revision": 2,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    }
+  ]
+}

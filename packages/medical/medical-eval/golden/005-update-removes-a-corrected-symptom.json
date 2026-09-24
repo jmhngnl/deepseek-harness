@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "update-removes-a-corrected-symptom",
+  "description": "Correcting an earlier statement removes exactly the symptom the user retracted: a correction that would empty the list is rejected by the domain rather than recorded as an erasure.",
+  "turns": [
+    {
+      "user": "我25岁，头疼发烧两天了",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    },
+    {
+      "user": "刚才说错了，其实没有发烧",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_update"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼"],
+          "age": 25,
+          "revision": 2,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    }
+  ]
+}

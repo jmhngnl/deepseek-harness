@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "intake-restatement-writes-nothing",
+  "description": "Repeating facts the case already holds is a restatement rather than a change: it again routes to intake, appends no record, and leaves the revision where it is.",
+  "turns": [
+    {
+      "user": "我25岁，头疼、发烧",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": null,
+          "age": 25,
+          "revision": 1,
+          "missingFields": ["duration"]
+        },
+        "mutation": {
+          "changed": true
+        }
+      }
+    },
+    {
+      "user": "对，我25岁，头疼、发烧",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_case_intake"
+            }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": null,
+          "age": 25,
+          "revision": 1,
+          "missingFields": ["duration"]
+        },
+        "mutation": {
+          "changed": false,
+          "eventCountDelta": 0
+        }
+      }
+    }
+  ]
+}
