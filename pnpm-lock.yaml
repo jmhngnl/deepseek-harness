@@ -248,6 +248,9 @@ importers:
       '@deepseek-ai/dsh-mcp-resources':
         specifier: workspace:^
         version: link:../../packages/mcp/mcp-resources
+      '@deepseek-ai/dsh-medharness':
+        specifier: workspace:^
+        version: link:../../packages/bundle/medharness
       '@deepseek-ai/dsh-persona':
         specifier: workspace:^
         version: link:../../packages/preset/persona
@@ -1795,6 +1798,103 @@ importers:
       '@deepseek-ai/dsh-session-query':
         specifier: workspace:^
         version: link:../../session-query/session-query
+
+  packages/bundle/medharness:
+    dependencies:
+      '@deepseek-ai/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-attachment-local':
+        specifier: workspace:^
+        version: link:../../attachment/attachment-local
+      '@deepseek-ai/dsh-credentials-local':
+        specifier: workspace:^
+        version: link:../../credentials/credentials-local
+      '@deepseek-ai/dsh-deepseek-llm-api-extensions':
+        specifier: workspace:^
+        version: link:../../llm/deepseek-llm-api-extensions
+      '@deepseek-ai/dsh-fs-sandbox':
+        specifier: workspace:^
+        version: link:../../fs/fs-sandbox
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-llm-deepseek':
+        specifier: workspace:^
+        version: link:../../llm/llm-deepseek
+      '@deepseek-ai/dsh-llm-retry':
+        specifier: workspace:^
+        version: link:../../llm/llm-retry
+      '@deepseek-ai/dsh-medical-case':
+        specifier: workspace:^
+        version: link:../../medical/medical-case
+      '@deepseek-ai/dsh-plugin-package-inventory-deepseek':
+        specifier: workspace:^
+        version: link:../../llm/plugin-package-inventory-deepseek
+      '@deepseek-ai/dsh-sandbox-local':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox-local
+      '@deepseek-ai/dsh-sandbox-policy':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox-policy
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-log-deepseek':
+        specifier: workspace:^
+        version: link:../../session/session-log-deepseek
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-session-projection-cache':
+        specifier: workspace:^
+        version: link:../../session/session-projection-cache
+      '@deepseek-ai/dsh-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+      '@deepseek-ai/dsh-storage':
+        specifier: workspace:^
+        version: link:../../storage/storage
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: workspace:^
+        version: link:../../storage/storage-domain
+      '@deepseek-ai/dsh-storage-json':
+        specifier: workspace:^
+        version: link:../../storage/storage-json
+      '@deepseek-ai/dsh-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-medical-case-get':
+        specifier: workspace:^
+        version: link:../../medical/tool-medical-case-get
+      '@deepseek-ai/dsh-tool-medical-case-intake':
+        specifier: workspace:^
+        version: link:../../medical/tool-medical-case-intake
+      '@deepseek-ai/dsh-tool-medical-case-update':
+        specifier: workspace:^
+        version: link:../../medical/tool-medical-case-update
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
 
   packages/bundle/sdk-app:
     dependencies:
