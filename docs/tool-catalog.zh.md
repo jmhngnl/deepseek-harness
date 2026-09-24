@@ -1684,7 +1684,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `medical_case_update`
 
-对会话已记录的病例应用一次增量变更。病例建立之后，用户给出的每一次补充都应使用它：新症状、病程、年龄或额外备注。省略的字段会保持已记录的值，因此只发送用户刚刚说过的内容。症状方面，优先用 symptomsAdd 表达"还有……"，用 symptomsRemove 更正此前的记录；只有在用户重述完整清单时才传 symptoms。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。绝不要用空白或空值去擦除内容：本工具不清空已记录的事实。调用会返回变更后的权威记录，missingFields 会告诉你下一步该追问什么。该工具只做输入记录与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
+对会话已记录的病例应用一次增量变更。病例建立之后，用户给出的每一次补充都应使用它：新症状、病程、年龄或额外备注。省略的字段会保持已记录的值，因此只发送用户刚刚说过的内容。症状方面，优先用 symptomsAdd 表达"还有……"，用 symptomsRemove 更正此前的记录；只有在用户重述完整清单时才传 symptoms。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。任何会导致病例不再记录任何症状的变更都会被拒绝：本工具只更正症状清单，从不清空病例。绝不要用空白或空值去擦除内容：本工具不清空已记录的事实。调用会返回变更后的权威记录，missingFields 会告诉你下一步该追问什么。该工具只做输入记录与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
 
 ```json
 {
@@ -1706,7 +1706,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "symptomsRemove": {
       "type": "array",
-      "description": "Symptoms to drop, for correcting an earlier record. A symptom that is not recorded is ignored. One symptom cannot appear in both symptomsAdd and symptomsRemove.",
+      "description": "Symptoms to drop, for correcting an earlier record. A symptom that is not recorded is ignored. One symptom cannot appear in both symptomsAdd and symptomsRemove, and a removal that would take every recorded symptom is rejected.",
       "items": {
         "type": "string"
       }

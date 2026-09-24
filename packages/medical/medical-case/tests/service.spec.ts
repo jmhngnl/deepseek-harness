@@ -177,6 +177,34 @@ describe('MedicalCaseService patch semantics', () => {
     expect(caseEvents(agent)).toHaveLength(1)
   })
 
+  it('refuses a delta that would clear the case, appending nothing and keeping the revision', async () => {
+    const { ctx, open } = await harness()
+    const agent = await open('session-a')
+    const created = ctx.medicalCase.create(agent, { symptoms: ['headache', 'fever'] })
+    const events = caseEvents(agent).length
+
+    expect(rejection(() => ctx.medicalCase.applyPatch(agent, { symptomsRemove: ['headache', 'fever'] })).code)
+      .toBe('CASE_INVALID_SYMPTOMS')
+
+    // A refusal is not a mutation: the log gains no record, and the revision
+    // the projection reports is still the one the create spent.
+    expect(caseEvents(agent)).toHaveLength(events)
+    const view = ctx.medicalCase.require(agent)
+    expect(view.revision).toBe(created.view.revision)
+    expect(view.symptoms).toEqual(['headache', 'fever'])
+  })
+
+  it('still clears the missing-symptom gap one recorded symptom at a time', async () => {
+    const { ctx, open } = await harness()
+    const agent = await open('session-a')
+    ctx.medicalCase.create(agent, { symptoms: ['headache', 'fever'], duration: '2 days' })
+    // Removing all but one is an ordinary correction, not an erasure.
+    const { view, changed } = ctx.medicalCase.applyPatch(agent, { symptomsRemove: ['fever'] })
+    expect(changed).toBe(true)
+    expect(view.symptoms).toEqual(['headache'])
+    expect(view.missingFields).toEqual(['age'])
+  })
+
   it('clamps a wall clock that steps backwards instead of publishing it', async () => {
     const { ctx, open } = await harness()
     const agent = await open('session-a')

@@ -228,9 +228,23 @@ function resolveSymptomDelta(current: readonly string[], patch: CasePatch): stri
       'CASE_INVALID_SYMPTOMS',
     )
   }
+  const removed = current.filter(symptom => remove.includes(symptom))
   const merged = current.filter(symptom => !remove.includes(symptom))
   for (const symptom of add) {
     if (!merged.includes(symptom)) merged.push(symptom)
+  }
+  // The clear-all rule the replacement path enforces, reached one entry at a
+  // time: a `symptomsRemove` that takes every recorded symptom is an erasure,
+  // and Phase 2 has no way to express that intent. The guard is conditional on
+  // something having actually been removed, so naming a symptom the case never
+  // held stays the no-op it already was, and filling in `age` on a case created
+  // from an incomplete first contact — which a caller may spell with an empty
+  // `symptomsAdd` — keeps working.
+  if (removed.length > 0 && merged.length === 0) {
+    throw new MedicalCaseError(
+      'symptomsRemove cannot remove every recorded symptom: an empty list cannot clear a recorded case',
+      'CASE_INVALID_SYMPTOMS',
+    )
   }
   return merged
 }

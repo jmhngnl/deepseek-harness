@@ -26,6 +26,7 @@ const description = 'Apply one incremental change to the case this session alrea
   + 'A field you omit keeps its recorded value, so send only what the user just told you. '
   + 'For symptoms, prefer symptomsAdd for "also ..." and symptomsRemove to correct a mistake; pass symptoms only when the user restates the whole list. '
   + 'symptoms cannot be combined with symptomsAdd or symptomsRemove, and one symptom cannot be both added and removed. '
+  + 'A change that would leave no symptom recorded is rejected: this tool corrects the list, it never clears the case. '
   + 'Never send a blank or empty value to erase something: this tool does not clear recorded facts. '
   + 'The call returns the authoritative record after the change, with missingFields telling you what to ask for next. '
   + 'This tool records and structures input only: it does not diagnose a condition, recommend treatment or medication, or assess medical risk.'
@@ -76,7 +77,7 @@ export function apply(ctx: Context): void {
       symptomsRemove: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Symptoms to drop, for correcting an earlier record. A symptom that is not recorded is ignored. One symptom cannot appear in both symptomsAdd and symptomsRemove.',
+        description: 'Symptoms to drop, for correcting an earlier record. A symptom that is not recorded is ignored. One symptom cannot appear in both symptomsAdd and symptomsRemove, and a removal that would take every recorded symptom is rejected.',
       },
       duration: {
         type: 'string',

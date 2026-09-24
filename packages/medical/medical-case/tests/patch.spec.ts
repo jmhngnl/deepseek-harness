@@ -125,6 +125,19 @@ describe('applyCasePatch keeps omitted fields', () => {
     const next = applyCasePatch(recorded(), { symptomsAdd: ['nausea'], symptomsRemove: ['fever'] }, NOW)
     expect(next?.symptoms).toEqual(['headache', 'nausea'])
   })
+
+  it('still fills the facts of a case created from an incomplete first contact', () => {
+    const incomplete = recorded({ symptoms: [], duration: null, age: null })
+    // A caller may spell "no symptom change" as an empty add; that must not be
+    // mistaken for an erasure, because the case legitimately holds none yet.
+    const next = applyCasePatch(incomplete, { age: 25, symptomsAdd: [] }, NOW)
+    expect(next?.symptoms).toEqual([])
+    expect(next?.age).toBe(25)
+  })
+
+  it('stays a no-op when the removal names nothing the case holds', () => {
+    expect(applyCasePatch(recorded({ symptoms: [] }), { symptomsRemove: ['headache'] }, NOW)).toBeUndefined()
+  })
 })
 
 describe('applyCasePatch rejects ambiguity instead of guessing', () => {
@@ -144,6 +157,24 @@ describe('applyCasePatch rejects ambiguity instead of guessing', () => {
   it('refuses an empty replacement list, which could only mean clearing the case', () => {
     expect(rejection(() => applyCasePatch(recorded(), { symptoms: [] }, NOW)).code).toBe('CASE_INVALID_SYMPTOMS')
     expect(rejection(() => applyCasePatch(recorded(), { symptoms: ['  ', ''] }, NOW)).code).toBe('CASE_INVALID_SYMPTOMS')
+  })
+
+  it('refuses a delta that would remove every recorded symptom', () => {
+    const error = rejection(() => applyCasePatch(recorded(), { symptomsRemove: ['headache', 'fever'] }, NOW))
+    expect(error.code).toBe('CASE_INVALID_SYMPTOMS')
+    expect(error.message).toContain('cannot remove every recorded symptom')
+  })
+
+  it('refuses a delta that empties the list one entry at a time in either order', () => {
+    for (const remove of [['headache', 'fever'], ['fever', 'headache'], [' headache ', 'fever']]) {
+      expect(rejection(() => applyCasePatch(recorded(), { symptomsRemove: remove }, NOW)).code)
+        .toBe('CASE_INVALID_SYMPTOMS')
+    }
+  })
+
+  it('accepts a delta that empties the removal set only because it adds a replacement', () => {
+    const next = applyCasePatch(recorded(), { symptomsRemove: ['headache', 'fever'], symptomsAdd: ['nausea'] }, NOW)
+    expect(next?.symptoms).toEqual(['nausea'])
   })
 
   it('refuses a blank string rather than treating it as a clear', () => {
