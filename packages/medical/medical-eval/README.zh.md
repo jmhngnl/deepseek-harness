@@ -55,6 +55,18 @@ const report = buildReport({ runId, startedAt, finishedAt, runtime, runs })
 
 `setup` 是 runner 唯一不做决定的地方。它按用例交回一个 harness，runner 永远不会知道背后的模型是脚本还是真实路由 —— 这正是同一份 roster 与同一个 Evaluator 能同时服务两者的原因。
 
+### 运行 live smoke
+
+```sh
+pnpm medharness:eval                                    # the three-case smoke
+pnpm medharness:eval --case get-reads-without-changing   # one named case
+pnpm medharness:eval --all                               # the whole roster
+```
+
+`runLiveEval` 通过 app-boot loader 启动 **shipped 的 `medharness` profile**——真实的 profile 目录、真实的 bundle 层、`dsh` launcher 使用的那个被修复过的 module fallback——自己不挂载任何插件，所以基准测的是真正交付的组合，而不是它的二次拼装。有两处刻意的减法，并且在源码里写明：排除 `@deepseek-ai/dsh-headless` 这组一次性 CLI 行（它们会去驱动自己的任务），并跳过 profile 的用户层（否则一处本机改动就能重新定义「shipped profile」的含义）。报告记录的是**启动后的组合自己解析出来的 route**，并且一旦组合发布了三个医疗工具之外的任何东西，这次运行会直接拒绝。
+
+Live 失败也是结果。这里不修用例、不放宽期望、不重跑到碰巧通过；失败分类、expected/actual、以及日志里的 seq 都会和其它运行一样落进报告。报告写入 `.medharness/eval-runs/`，与 session 日志放在一起，而不是进版本历史。
+
 ### 读一个失败
 
 每个失败都带 `goldenCaseId`、`turnIndex`、`sessionId`、`failureType`、两侧的实际取值，以及可在持久日志里定位的会话序号。
@@ -119,16 +131,13 @@ pnpm vitest run packages/medical/medical-eval
 两条策略让 roster 保持诚实而不是脆弱：
 
 - **只在「抽取本身就是用例要点」时才钉住参数。** 当同一次正确调用的两种写法会产生同一份记录时，参数就不出现 —— 这样用例永远不会因为命名之外的原因失败。
-- **自由文本只在其取值无歧义时才钉住** —— roster 钉 `duration: null`，并靠 `missingFields` 证明持续时间已被记录。模型往自由文本字段里写了什么，是关于它措辞的数据点，而不是契约。
+- **自由文本只在其取值无歧义时才钉住** —— roster 从不钉 `duration` 的字面值。用户一旦提供了持续时间，其措辞就有多种等价写法，所以这类用例钉的是 `missingFields: []`：它才是「持续时间已被记录」的证据。字面量 `duration: null` 只出现在用户未提供持续时间的用例里，在那里它是「没有凭空编造」的证据。模型往自由文本字段里写了什么，是关于它措辞的数据点，而不是契约。
 
 ### 失败分类法
 
 Failure Taxonomy **v1**，位于 [`src/types.ts`](src/types.ts)。它是未来 bad-case 收集器的聚类键，因此新增成员属于契约变更：连同 schema 版本一起提升，而不是把一个名字复用于新的含义。它并非冻结 —— 它是版本化的。
 
-`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` ·
-`ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` ·
-`REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` ·
-`CASE_ID_CHANGED` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
+`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` · `ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` · `REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` · `CASE_ID_CHANGED` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
 
 两条规则让分类保持有意义：
 

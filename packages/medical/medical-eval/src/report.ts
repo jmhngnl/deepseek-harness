@@ -61,8 +61,9 @@ export function buildReport(input: ReportInput): EvalReport {
  * Derive a run identity from the instant the run started.
  *
  * Deterministic in its argument rather than random, so a report's file name can
- * be predicted from its start time and two runs started in the same second are
- * the same run as far as the directory is concerned.
+ * be predicted from its start time and two runs started in the same millisecond
+ * are the same run as far as the directory is concerned. `toISOString` keeps
+ * milliseconds, so that is the resolution the identity actually has.
  * @param instant - when the run started.
  * @returns a filesystem-safe identifier.
  */

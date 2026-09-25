@@ -55,6 +55,18 @@ const report = buildReport({ runId, startedAt, finishedAt, runtime, runs })
 
 `setup` is the only thing the runner does not decide. It hands back one harness per case and never learns whether the model behind it is a script or a live route, which is what lets the same roster and the same evaluator serve both.
 
+### Running the live smoke
+
+```sh
+pnpm medharness:eval                                    # the three-case smoke
+pnpm medharness:eval --case get-reads-without-changing   # one named case
+pnpm medharness:eval --all                               # the whole roster
+```
+
+`runLiveEval` boots the shipped `medharness` profile through the app-boot loader — the real profile directory, the real bundle layers, the real healed module fallback the `dsh` launcher uses — and mounts nothing of its own, so a benchmark measures the composition that ships rather than a re-mounting of it. Two subtractions are deliberate and named in the source: the `@deepseek-ai/dsh-headless` one-shot CLI rows are excluded, because they would drive a task of their own, and the profile's user layers are skipped, so a machine-local edit cannot redefine what "the shipped profile" means. The report states the route the booted composition resolved, and the run refuses a composition that published anything but the three medical tools.
+
+A live failure is a result. Nothing here repairs a case, loosens an expectation, or retries until it passes; the failure taxonomy, the expected and actual values, and the log sequences all land in the report like any other run. Reports are written to `.medharness/eval-runs/`, beside the session logs rather than in history.
+
 ### Reading a failure
 
 Every failure carries `goldenCaseId`, `turnIndex`, `sessionId`, `failureType`, both values, and the session sequences to look up in the durable log.
@@ -97,22 +109,13 @@ Every one of those tests runs offline: no API key, no network, no remote model.
 
 ### Why a case is data
 
-A golden case is reviewed, versioned, and replayed against a real model, so it
-cannot be an `if` inside a spec: a reader has to be able to see what the suite
-claims without reading code, and a claim has to be diffable. `schemaVersion`
-travels with every document and the reader refuses a version it does not know,
-so widening the contract is a visible act rather than a silent one.
+A golden case is reviewed, versioned, and replayed against a real model, so it cannot be an `if` inside a spec: a reader has to be able to see what the suite claims without reading code, and a claim has to be diffable. `schemaVersion` travels with every document and the reader refuses a version it does not know, so widening the contract is a visible act rather than a silent one.
 
-The reader also **rejects members it does not define**. Without that rule a
-mistyped `caseStete` would read as "no state expectation" — the one failure
-mode that silently weakens a suite while every test still passes.
+The reader also **rejects members it does not define**. Without that rule a mistyped `caseStete` would read as "no state expectation" — the one failure mode that silently weakens a suite while every test still passes.
 
 ### Self-contained cases
 
-Every case replays into a fresh session and states its own history. A case that
-needs a record already on file records it in its own earlier turns; no runner
-may seed state. The roster is checked for this: the first turn of every case
-must open a case at revision one, which is only reachable from a fresh session.
+Every case replays into a fresh session and states its own history. A case that needs a record already on file records it in its own earlier turns; no runner may seed state. The roster is checked for this: the first turn of every case must open a case at revision one, which is only reachable from a fresh session.
 
 ### What a case may pin
 
@@ -127,43 +130,23 @@ must open a case at revision one, which is only reachable from a fresh session.
 
 Two policies keep the roster honest rather than brittle:
 
-- **Arguments are pinned only where extraction is the point.** They are absent
-  wherever two spellings of the same correct call produce the same record, so a
-  case never fails for a reason other than the one it names.
-- **A free-text value is pinned only where it is unambiguous** — the roster
-  pins `duration: null` and relies on `missingFields` to prove a duration was
-  recorded. What the model writes into a free-text field is a data point about
-  its phrasing, not a contract.
+- **Arguments are pinned only where extraction is the point.** They are absent wherever two spellings of the same correct call produce the same record, so a case never fails for a reason other than the one it names.
+- **A free-text value is pinned only where it is unambiguous** — the roster never pins a `duration` literal. Once the user has supplied a duration, its wording has several equivalent spellings, so such a case pins `missingFields: []` instead: that is the proof the duration was recorded. The literal `duration: null` appears only where the user supplied none, and there it is the proof that nothing was invented. What the model writes into a free-text field is a data point about its phrasing, not a contract.
 
 ### The failure taxonomy
 
-Failure Taxonomy **v1**, in [`src/types.ts`](src/types.ts). It is the clustering
-key a future bad-case collector groups by, so a new member is a contract change:
-raise the schema versions with it rather than reusing a name for a new meaning.
-It is not frozen — versioned.
+Failure Taxonomy **v1**, in [`src/types.ts`](src/types.ts). It is the clustering key a future bad-case collector groups by, so a new member is a contract change: raise the schema versions with it rather than reusing a name for a new meaning. It is not frozen — versioned.
 
-`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` ·
-`ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` ·
-`REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` ·
-`CASE_ID_CHANGED` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
+`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` · `ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` · `REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` · `CASE_ID_CHANGED` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
 
 Two rules keep the classification meaningful:
 
-- An argument fault is reported **only** for a value an expectation pinned.
-  Without one there is no ground truth about what the model extracted, so a
-  case-state difference stays a `CASE_STATE_MISMATCH` rather than a guess.
-- `caseId`, `createdAt`, and `updatedAt` have no deterministic value, so what is
-  asserted is their **continuity**: a later revision keeping an earlier one's
-  identity, and the mutation clock never stepping backwards. A violation of
-  either is a case-state mismatch, because that is the state a reader should
-  look at.
+- An argument fault is reported **only** for a value an expectation pinned. Without one there is no ground truth about what the model extracted, so a case-state difference stays a `CASE_STATE_MISMATCH` rather than a guess.
+- `caseId`, `createdAt`, and `updatedAt` have no deterministic value, so what is asserted is their **continuity**: a later revision keeping an earlier one's identity, and the mutation clock never stepping backwards. A violation of either is a case-state mismatch, because that is the state a reader should look at.
 
 ### The evaluator is pure
 
-`evaluateTurn` and `evaluateCase` read no session, touch no file, call no model,
-and read no clock. The runner observes; the evaluator decides. That is what
-lets a report be recomputed from stored observations, and what a future
-evolution planner can reuse without standing up a runtime.
+`evaluateTurn` and `evaluateCase` read no session, touch no file, call no model, and read no clock. The runner observes; the evaluator decides. That is what lets a report be recomputed from stored observations, and what a future evolution planner can reuse without standing up a runtime.
 
 ### The report is not a score
 
@@ -180,45 +163,25 @@ summary: {
 }
 ```
 
-A single weighted number would have to be agreed before there is data to agree
-it against, and its dimensions are not interchangeable. Two rules follow:
+A single weighted number would have to be agreed before there is data to agree it against, and its dimensions are not interchangeable. Two rules follow:
 
-- Routing is counted **per turn**, so the denominator is the turn count however
-  the model behaved. A turn that faulted produced no routing assertion to pass,
-  so it counts against the ratio rather than for it.
-- Usage carries its own coverage. Sums over the turns that reported usage travel
-  with the count, so a partially measured run reads as incomplete rather than as
-  cheap. Nothing here estimates tokens: `length / 4` is not usage.
+- Routing is counted **per turn**, so the denominator is the turn count however the model behaved. A turn that faulted produced no routing assertion to pass, so it counts against the ratio rather than for it.
+- Usage carries its own coverage. Sums over the turns that reported usage travel with the count, so a partially measured run reads as incomplete rather than as cheap. Nothing here estimates tokens: `length / 4` is not usage.
 
 ### Turn boundaries
 
-The runner reads the durable sequence before admitting a turn's message and
-takes only the events above it, so a turn's observation cannot inherit the
-previous turn's calls or its case record. The ceiling is enforced by
-**cancelling** the agent rather than by abandoning the wait: the turn then
-converges to idle and closes itself in the log, so a hung turn still produces
-the `turn/end` its observation is read from and the harness can be disposed.
+The runner reads the durable sequence before admitting a turn's message and takes only the events above it, so a turn's observation cannot inherit the previous turn's calls or its case record. The ceiling is enforced by **cancelling** the agent rather than by abandoning the wait: the turn then converges to idle and closes itself in the log, so a hung turn still produces the `turn/end` its observation is read from and the harness can be disposed.
 
 ### Why the composition is the caller's
 
-The runner builds no services, registers no tools, and knows no model. A
-composition re-mounted inside the harness would be a second thing to keep in
-step with the one that ships, so the caller supplies the runtime and the harness
-supplies only the replay. This is also what makes the live runner possible
-without a second code path.
+The runner builds no services, registers no tools, and knows no model. A composition re-mounted inside the harness would be a second thing to keep in step with the one that ships, so the caller supplies the runtime and the harness supplies only the replay. This is also what makes the live runner possible without a second code path.
 
 ### Integration seams (Phase 3B)
 
 Neither is wired up, by decision: this phase adds offline infrastructure only.
 
-- **Bad-case collection.** `ctx.messageFeedback.list({ sessionId })` reads
-  persisted per-message ratings offline, so negative feedback can become a real
-  source of production cases. Feedback is stored as **non-surface** events, so
-  it never enters model history — a property the tools' own specs pin.
-- **Case discovery.** `ctx.sessionQuery` reads, filters, and traces persisted
-  sessions in the host plane. The `session_search`-style tools that expose it to
-  a model stay out of the medical agent: the collector is an offline consumer,
-  not a capability, and the surface stays at three tools.
+- **Bad-case collection.** `ctx.messageFeedback.list({ sessionId })` reads persisted per-message ratings offline, so negative feedback can become a real source of production cases. Feedback is stored as **non-surface** events, so it never enters model history — a property the tools' own specs pin.
+- **Case discovery.** `ctx.sessionQuery` reads, filters, and traces persisted sessions in the host plane. The `session_search`-style tools that expose it to a model stay out of the medical agent: the collector is an offline consumer, not a capability, and the surface stays at three tools.
 
 </details>
 
@@ -262,20 +225,10 @@ None; the evaluator walks plain data and the runner drives an existing loop.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package is deliberately not mounted by `packages/bundle/medharness`. The
-harness is an offline consumer of the runtime, and mounting it would put
-evaluation infrastructure inside the thing being evaluated. The bundle's own
-test asserts that its declared rows and its declared dependencies match in both
-directions, so adding a row for this package would fail that test before it
-could reach an agent's surface.
+This package is deliberately not mounted by `packages/bundle/medharness`. The harness is an offline consumer of the runtime, and mounting it would put evaluation infrastructure inside the thing being evaluated. The bundle's own test asserts that its declared rows and its declared dependencies match in both directions, so adding a row for this package would fail that test before it could reach an agent's surface.
 
-`src/index.ts` is a pure re-export module, which v8 reports as having no
-measurable statements. That is why it shows as 0% in a scoped coverage run and
-why the per-file gate does not flag it.
+`src/index.ts` is a pure re-export module, which v8 reports as having no measurable statements. That is why it shows as 0% in a scoped coverage run and why the per-file gate does not flag it.
 
-`observeTurn` is public and takes an event slice directly, so its own spec
-covers log shapes the runner does not produce — an incomplete boundary pair, an
-empty slice. Those are contract tests for the seam rather than defensive code
-with no test.
+`observeTurn` is public and takes an event slice directly, so its own spec covers log shapes the runner does not produce — an incomplete boundary pair, an empty slice. Those are contract tests for the seam rather than defensive code with no test.
 
 </details>

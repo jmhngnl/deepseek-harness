@@ -20,6 +20,11 @@
  *   → buildReport (counts, ratios, and the evidence each failure carries)
  * ```
  *
+ * Two callers supply the harness that seam expects. A deterministic suite
+ * hand-mounts one per case around a scripted adapter; `runLiveEval` boots the
+ * shipped `medharness` profile instead, so a benchmark measures the composition
+ * that ships rather than a re-mounting of it.
+ *
  * @module @deepseek-ai/dsh-medical-eval
  */
 
@@ -39,3 +44,24 @@ export { buildReport, createRunId, evalRunsDirectory, writeEvalReport } from './
 export type { ReportInput } from './report.ts'
 export { runGoldenCases } from './runner.ts'
 export type { GoldenCaseHarness, GoldenRunOptions } from './runner.ts'
+export {
+  LIVE_APP_SURFACE_BUNDLE,
+  LIVE_MEDICAL_TOOLS,
+  LIVE_PROFILE,
+  SMOKE_CASE_IDS,
+  liveRoster,
+  liveRuntime,
+  parseLiveArgs,
+  renderLiveArgsErrors,
+  renderLiveSummary,
+  runLiveEval,
+  selectLiveCases,
+} from './live.ts'
+export type {
+  LiveArgs,
+  LiveArgsResult,
+  LiveEvalOptions,
+  LiveEvalResult,
+  LiveIo,
+  LiveRoute,
+} from './live.ts'
