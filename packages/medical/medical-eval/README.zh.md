@@ -63,7 +63,7 @@ pnpm medharness:eval --case get-reads-without-changing   # one named case
 pnpm medharness:eval --all                               # the whole roster
 ```
 
-`runLiveEval` 通过 app-boot loader 启动 **shipped 的 `medharness` profile**——真实的 profile 目录、真实的 bundle 层、`dsh` launcher 使用的那个被修复过的 module fallback——自己不挂载任何插件，所以基准测的是真正交付的组合，而不是它的二次拼装。有两处刻意的减法，并且在源码里写明：排除 `@deepseek-ai/dsh-headless` 这组一次性 CLI 行（它们会去驱动自己的任务），并跳过 profile 的用户层（否则一处本机改动就能重新定义「shipped profile」的含义）。报告记录的是**启动后的组合自己解析出来的 route**，并且一旦组合发布了三个医疗工具之外的任何东西，这次运行会直接拒绝。
+`runLiveEval` 通过 app-boot loader 启动 **shipped 的 `medharness` profile**——真实的 profile 目录、真实的 bundle 层、`dsh` launcher 使用的那个被修复过的 module fallback——自己不挂载任何插件，所以基准测的是真正交付的组合，而不是它的二次拼装。有两处刻意的减法，并且在源码里写明：排除 `@deepseek-ai/dsh-headless` 这组一次性 CLI 行（它们会去驱动自己的任务），并跳过 profile 的用户层（否则一处本机 patch 就能重新定义「shipped profile」的含义）。仅跳过 patch 层还不够：`app-boot` 只会在 profile manifest 的 `dsh.profile.bundles` 仍等于 shipped 模板时才做归一化，其它任何列表都按「用户自有」原样保留，于是一份手改过的 `package.json` 照样会被启动、并且照样被报告成 shipped。因此这次运行会断言「载入的 profile 恰好组合了 shipped 的那几个 bundle」，不符合就拒绝测量——是拒绝，不是修复：被拒的 profile 会被原样留在那里。报告记录的是**启动后的组合自己解析出来的 route**，一次运行里的每个用例都必须解析出同一条 route，否则根本不会写出报告；并且一旦组合发布了三个医疗工具之外的任何东西，这次运行会直接拒绝。
 
 Live 失败也是结果。这里不修用例、不放宽期望、不重跑到碰巧通过；失败分类、expected/actual、以及日志里的 seq 都会和其它运行一样落进报告。报告写入 `.medharness/eval-runs/`，与 session 日志放在一起，而不是进版本历史。
 
@@ -211,7 +211,7 @@ None, as this package registers no model-visible content：它是评测基础设
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **还没有真实模型入口** —— 确定性 runner 已经完整，roster 也是按可对真实模型回放来写的，但「启动 MedHarness profile、对已配置模型跑一个子集、写出报告」的命令还没有做。那是下一步，而不是重新设计。
+- **CI 不覆盖 live 路径** —— 这里的每个测试都提供脚本化的 route，因为测试套件不该花掉一次真实模型请求。因此「不传 route、走组合自己配置的模型」这条路径只有在有人手动跑 `pnpm medharness:eval` 时才会被执行，而套件不会察觉它坏掉。两条路径的差别只在 selection 从哪来：其后的启动、surface 守卫、回放、报告，都是同一份代码。
 - **只有一种路由形态** —— 仅 `kind: 'exact'`。意图确实存在多条等价调用路径的轮次不会进 roster，也不会被写成备选列表，因为一个不止一个正确答案的期望无法为某个确定的原因失败。
 - **每个会话只期望一个病例** —— 用例断言的是它自己的轮次建立起来的那个病例。多就诊历史需要领域先长出来。
 - **自由文本按字面比较** —— `symptoms` 与 `duration` 在领域里是自由文本，所以钉住其一就是钉住模型的措辞。roster 正是出于这个原因不钉 `duration` 的文本；真实运行报出措辞差异，报的是关于模型的事实，而不是框架故障。

@@ -1,20 +1,22 @@
 /**
  * Live-runner coverage: the argument grammar, the case selection, the
- * statements the report makes about itself, the surface guard, and one booted
- * composition.
+ * statements the report makes about itself, the three guards a run states what
+ * it measured with, and two booted compositions.
  *
- * Exactly one test here boots, because booting is the expensive part and one
- * run already exercises the seam. Its model is scripted: CI must not spend a
- * real request, and a live failure is a result to be read rather than a flake
- * to be retried. What the runner does with the composition's own default route
- * — the live path — is deliberately not faked here; a route substituted for it
- * would misreport what the report's `runner: live` line claims.
+ * Two tests here boot — a replay and a timeout — because booting is the
+ * expensive part and each one exercises a different ending. Both models are
+ * scripted: CI must not spend a real request, and a live failure is a result to
+ * be read rather than a flake to be retried. What the runner does with the
+ * composition's own default route — the live path — is deliberately not faked
+ * here; a route substituted for it would misreport what the report's
+ * `runner: live` line claims.
  */
 
-import { existsSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-llm'
 import { buildReport, createRunId } from '../src/index.ts'
 import type { EvalReport, GoldenCase } from '../src/index.ts'
@@ -23,6 +25,8 @@ import {
   LIVE_PROFILE,
   SMOKE_CASE_IDS,
   assertMedicalSurface,
+  assertShippedProfile,
+  assertSingleRoute,
   liveRoster,
   liveRuntime,
   parseLiveArgs,
@@ -223,10 +227,108 @@ describe('the surface guard', () => {
   })
 })
 
+describe('the shipped-profile guard', () => {
+  /**
+   * The shipped medharness bundle list, stated literally so that a template
+   * edit is a failure here rather than a silent change of what the runner
+   * measures. The first assertion pins the two together.
+   */
+  const SHIPPED_BUNDLES = ['@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-medharness']
+
+  it('accepts the shipped bundle list', () => {
+    expect(PROFILE_TEMPLATES[LIVE_PROFILE]?.bundles).toEqual(SHIPPED_BUNDLES)
+    expect(() => { assertShippedProfile(LIVE_PROFILE, SHIPPED_BUNDLES) }).not.toThrow()
+  })
+
+  it('rejects a profile whose bundle list was trimmed', () => {
+    expect(() => { assertShippedProfile(LIVE_PROFILE, ['@deepseek-ai/dsh-medharness']) })
+      .toThrow(/user-owned and no longer composes the shipped bundles/)
+  })
+
+  it('rejects a reordered list, not just a shorter one', () => {
+    expect(() => { assertShippedProfile(LIVE_PROFILE, [...SHIPPED_BUNDLES].reverse()) })
+      .toThrow(/expected @deepseek-ai\/dsh-headless, @deepseek-ai\/dsh-medharness/)
+  })
+
+  it('rejects a substituted layer and names what it found instead', () => {
+    expect(() => { assertShippedProfile(LIVE_PROFILE, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-medharness']) })
+      .toThrow(/found @deepseek-ai\/dsh-base, @deepseek-ai\/dsh-medharness/)
+  })
+
+  it('names an empty layer list rather than printing nothing', () => {
+    expect(() => { assertShippedProfile(LIVE_PROFILE, []) }).toThrow(/found nothing/)
+  })
+
+  it('refuses a name that is not a shipped profile', () => {
+    expect(() => { assertShippedProfile('not-a-shipped-profile', []) })
+      .toThrow(/no shipped profile template/)
+  })
+})
+
+describe('the route consistency guard', () => {
+  const FIRST = { caseId: 'intake-first-contact-two-symptoms', route: { provider: 'p', model: 'm' } }
+
+  it('returns the route every case resolved', () => {
+    expect(assertSingleRoute([FIRST, { caseId: 'update-completes-the-record', route: { provider: 'p', model: 'm' } }]))
+      .toEqual({ provider: 'p', model: 'm' })
+  })
+
+  it('names both cases when a later case resolved a different provider', () => {
+    expect(() => assertSingleRoute([FIRST, { caseId: 'update-completes-the-record', route: { provider: 'other', model: 'm' } }]))
+      .toThrow(/intake-first-contact-two-symptoms ran p\/m, update-completes-the-record ran other\/m/)
+  })
+
+  it('names both cases when a later case resolved a different model', () => {
+    expect(() => assertSingleRoute([FIRST, { caseId: 'update-completes-the-record', route: { provider: 'p', model: 'other' } }]))
+      .toThrow(/intake-first-contact-two-symptoms ran p\/m, update-completes-the-record ran p\/other/)
+  })
+
+  it('refuses a run that produced no route at all', () => {
+    expect(() => assertSingleRoute([])).toThrow(/no case produced a runtime route/)
+  })
+})
+
 describe('a run with nothing selected', () => {
   it('refuses before booting anything', async () => {
     await expect(runLiveEval({ root: tmpdir(), cases: [] }))
       .rejects.toThrow(/no case selected/)
+  })
+})
+
+describe('a user-owned profile', () => {
+  /**
+   * The manifest a user would be left with after editing their own
+   * `$DSH_HOME/profiles/medharness/package.json`. `app-boot` leaves a bundle
+   * list it does not recognize exactly as written, so nothing else in the stack
+   * would stop this profile from being booted and reported as shipped.
+   */
+  function editProfileBundles(bundles: readonly string[]): { readonly home: string; readonly dir: string } {
+    const home = mkdtempSync(join(tmpdir(), 'medharness-user-profile-'))
+    const dir = join(home, 'profiles', LIVE_PROFILE)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: `dsh-profile-${LIVE_PROFILE}`,
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...bundles], patchReload: 'startup' } },
+    }))
+    return { home, dir }
+  }
+
+  it('refuses to measure it, and leaves it untouched rather than repairing it', async () => {
+    const { home, dir } = editProfileBundles(['@deepseek-ai/dsh-medharness'])
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+    try {
+      await expect(runLiveEval({ root: tmpdir(), cases: [rosterCase('intake-first-contact-two-symptoms')] }))
+        .rejects.toThrow(/user-owned and no longer composes the shipped bundles/)
+      // The refusal lands before the include root is written, so a rejected run
+      // is not a run that quietly edited the profile it rejected.
+      expect(existsSync(join(dir, 'cordis.yml'))).toBe(false)
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
   })
 })
 

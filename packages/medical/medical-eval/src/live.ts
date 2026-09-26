@@ -25,10 +25,19 @@
  *   provider, the endpoint, and the key all resolve from
  *   `$DSH_HOME/settings.yaml` and the credential store, not from a patch layer.
  *
- * The runner cannot inspect its own provenance, but it can inspect what it
- * booted, so it does: the composition must publish exactly the three medical
- * tools. A surface that gained a fourth one fails the run rather than silently
- * widening what the numbers below describe.
+ * Skipping the patch layer is not on its own enough to make that claim true.
+ * `app-boot` normalizes a profile manifest only while its `dsh.profile.bundles`
+ * still equals the shipped template; any other list is user-owned and is left
+ * exactly as written. A hand-edited
+ * `$DSH_HOME/profiles/medharness/package.json` would therefore be booted
+ * verbatim and still be reported as the shipped composition. So the runner
+ * states what it measured rather than assuming it, and refuses rather than
+ * reports loosely: the loaded profile must still compose the shipped bundles,
+ * and the booted composition must publish exactly the three medical tools. A
+ * profile whose bundles were edited, or a composition that gained a fourth
+ * tool, fails the run rather than silently widening what the numbers below
+ * describe. Neither guard repairs anything — an edited profile is a refusal,
+ * not a profile to rewrite.
  *
  * A live failure is a result. Nothing here repairs, retries, or relaxes a case
  * to make one pass.
@@ -44,6 +53,7 @@ import {
   boot,
   healProfilesModuleFallback,
   loadProfile,
+  PROFILE_TEMPLATES,
   PluginPackages,
 } from '@deepseek-ai/dsh-app-boot'
 import type { Profile } from '@deepseek-ai/dsh-app-boot'
@@ -300,20 +310,26 @@ export function renderLiveSummary(report: EvalReport, path: string): string[] {
 }
 
 /**
- * Load the shipped profile, write its empty include root, and heal the module
- * fallback the bare specifiers in its rows resolve through.
+ * Load the shipped profile, refuse a user-owned one, write its empty include
+ * root, and heal the module fallback the bare specifiers in its rows resolve
+ * through.
  *
  * Done once per run rather than once per case: the profile directory, its
  * layers, and the fallback table do not change between cases, and healing is
  * the expensive part.
+ *
+ * The provenance check runs before anything is written into the profile
+ * directory, so a refused run leaves it exactly as it found it.
  * @returns the loaded profile, with its root config written.
- * @throws when the shipped profile cannot be loaded or its fallback repaired.
+ * @throws when the profile no longer composes the shipped bundles, cannot be
+ * loaded, or its fallback cannot be repaired.
  */
 async function prepareLiveComposition(): Promise<{
   readonly profileDir: string
   readonly bundlePatches: BundlePatches
 }> {
   const profile = loadProfile(LIVE_PROFILE, LIVE_PROFILE, INSTALL_ANCHOR, undefined, { userLayer: false })
+  assertShippedProfile(LIVE_PROFILE, profile.layers.map(layer => layer.packageName))
   writeFileSync(join(profile.dir, ROOT_CONFIG_FILENAME), ROOT_CONFIG_CONTENT)
   await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, profile })
   return {
@@ -343,6 +359,83 @@ export function assertMedicalSurface(published: readonly string[]): void {
       + ` it published ${actual.length === 0 ? 'nothing' : actual.join(', ')}`,
     )
   }
+}
+
+/**
+ * Assert a loaded profile still composes the shipped bundle list.
+ *
+ * The check is on the layers the loader actually resolved, because that is what
+ * boot consumes — and it is the only check that can tell a shipped profile from
+ * a user-owned one. `app-boot` rewrites a manifest whose `dsh.profile.bundles`
+ * equals the shipped template, or a retired installation tuple, and leaves every
+ * other list exactly as written; so a mismatch here means the composition about
+ * to be measured is not the one that ships.
+ *
+ * Nothing is repaired. A user-owned profile is a refusal: rewriting the
+ * manifest would answer the question by changing it.
+ *
+ * Exported for its own test rather than for callers — it takes names so the
+ * check needs no loaded profile to exercise.
+ * @param name - the shipped profile the runner is about to boot.
+ * @param bundles - the bundle package names the loaded profile resolved, in order.
+ * @throws when the name has no shipped template, or the layers are not exactly
+ * {@link PROFILE_TEMPLATES}'s bundles for it.
+ */
+export function assertShippedProfile(name: string, bundles: readonly string[]): void {
+  const template = PROFILE_TEMPLATES[name]
+  if (template === undefined) {
+    throw new Error(`${name}: no shipped profile template, so there is no composition for the live runner to measure`)
+  }
+  const expected = template.bundles
+  const actual = [...bundles]
+  if (actual.length !== expected.length || actual.some((bundle, index) => bundle !== expected[index])) {
+    throw new Error(
+      `${name}: the profile is user-owned and no longer composes the shipped bundles;`
+      + ` expected ${expected.join(', ')}, found ${actual.length === 0 ? 'nothing' : actual.join(', ')}.`
+      + ' The live runner measures the SHIPPED composition and refuses to report a modified one as shipped.',
+    )
+  }
+}
+
+/** One case's resolved route, kept beside the case that resolved it. */
+export interface LiveRouteSample {
+  /** The case whose boot resolved {@link LiveRouteSample.route}. */
+  readonly caseId: string
+  /** The provider and model that boot resolved for that case. */
+  readonly route: LiveRoute
+}
+
+/**
+ * Assert a run resolved one route, and return it.
+ *
+ * Every case boots the same composition, so every case must resolve the same
+ * provider and model. A run that did not — settings edited mid-run, a route
+ * that depends on something the composition does not own — would still produce
+ * a single `runtime` block, and that block would name one model while the
+ * numbers beside it came from several. The report is refused instead of
+ * written.
+ *
+ * Exported for its own test rather than for callers — it takes the samples so
+ * the check needs no booted run to exercise.
+ * @param samples - one entry per replayed case, in run order.
+ * @returns the route every case resolved.
+ * @throws when no case produced a route, or a case resolved a different one
+ * than the first.
+ */
+export function assertSingleRoute(samples: readonly LiveRouteSample[]): LiveRoute {
+  const first = samples[0]
+  if (first === undefined) throw new Error('medharness:eval: no case produced a runtime route')
+  for (const sample of samples.slice(1)) {
+    if (sample.route.provider !== first.route.provider || sample.route.model !== first.route.model) {
+      throw new Error(
+        `medharness:eval: the run resolved more than one route — ${first.caseId} ran`
+        + ` ${first.route.provider}/${first.route.model}, ${sample.caseId} ran`
+        + ` ${sample.route.provider}/${sample.route.model}. A report describes one route,`
+        + ' so a run that spanned several is refused rather than misreported.',
+      )
+    }
+  }
+  return first.route
 }
 
 /**
@@ -409,27 +502,27 @@ async function bootCase(
  *
  * The route the report carries is the one the booted composition resolved, not
  * one this module guessed: every case boots the same patch set, so the boot is
- * where the answer lives.
+ * where the answer lives — and every case must resolve the same one, which
+ * {@link assertSingleRoute} settles before a report exists.
  * @param options - the cases, the checkout root, and optional route and hooks.
  * @returns the report, its path, and the route it recorded.
- * @throws when no case was selected, or the composition cannot be booted.
+ * @throws when no case was selected, the composition cannot be booted, or the
+ * cases did not all resolve one route.
  */
 export async function runLiveEval(options: LiveEvalOptions): Promise<LiveEvalResult> {
   if (options.cases.length === 0) {
     throw new Error('medharness:eval: no case selected')
   }
   const composition = await prepareLiveComposition()
-  const routes: LiveRoute[] = []
+  const samples: LiveRouteSample[] = []
   const startedAt = new Date()
   const runs = await runGoldenCases(options.cases, async (golden) => {
     const booted = await bootCase(composition, golden, options)
-    routes.push(booted.route)
+    samples.push({ caseId: golden.id, route: booted.route })
     return booted.harness
   }, options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs })
   const finishedAt = new Date()
-  const route = routes[0]
-  /* v8 ignore next -- the guard above rejects an empty case list, so every case pushed a route */
-  if (route === undefined) throw new Error('medharness:eval: no case produced a runtime route')
+  const route = assertSingleRoute(samples)
   const report = buildReport({
     runId: createRunId(startedAt),
     startedAt: startedAt.toISOString(),
