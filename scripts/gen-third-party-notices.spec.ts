@@ -180,6 +180,61 @@ describe('virtualManifest', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('skips a platform-skipped store directory that holds no manifest', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-notices-shell-'))
+    try {
+      const name = '@anthropic-ai/claude-agent-sdk-darwin-arm64'
+      const store = join(root, 'store')
+      // pnpm creates this directory for an optional dependency whose os/cpu do
+      // not match the host, then never populates it: the directory name matches
+      // the prefix while the manifest is absent. Windows leaves one of these
+      // for every non-win32 platform payload of the Claude Code SDK.
+      mkdirSync(join(store, `${name.replace('/', '+')}@0.3.263`, 'node_modules'), { recursive: true })
+
+      expect(virtualManifest(store, name)).toBeUndefined()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not let a platform-skipped shell shadow the copy that is installed', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-notices-shadow-'))
+    try {
+      const name = '@anthropic-ai/claude-agent-sdk-darwin-arm64'
+      const store = join(root, 'store')
+      // The shell is named so that a sorted read reaches it first, which is the
+      // order that used to abort the scan; the store's real order is not
+      // guaranteed, so the assertions below are on the outcome either way.
+      mkdirSync(join(store, `${name.replace('/', '+')}@0.3.263`, 'node_modules'), { recursive: true })
+      const installed = join(store, `${name.replace('/', '+')}@0.3.264`, 'node_modules', name)
+      mkdirSync(installed, { recursive: true })
+      writeFileSync(join(installed, 'package.json'), JSON.stringify({ name, version: '0.3.264', license: 'MIT' }))
+
+      expect(virtualManifest(store, name)).toMatchObject({ name, version: '0.3.264', license: 'MIT' })
+      expect(virtualManifest(store, name, '0.3.264')).toMatchObject({ version: '0.3.264' })
+      expect(virtualManifest(store, name, '0.3.263')).toBeUndefined()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('still fails on a candidate that exists but cannot be parsed', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-notices-corrupt-'))
+    try {
+      const name = '@scope/pkg'
+      const store = join(root, 'store')
+      const manifestDir = join(store, `${name.replace('/', '+')}@1.0.0`, 'node_modules', name)
+      mkdirSync(manifestDir, { recursive: true })
+      writeFileSync(join(manifestDir, 'package.json'), '{ not json')
+
+      // The guard covers absence, not unreadability: a corrupt manifest is a
+      // real fault and must keep surfacing rather than being skipped.
+      expect(() => virtualManifest(store, name)).toThrow(SyntaxError)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('parseVendoredRows', () => {

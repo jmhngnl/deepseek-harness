@@ -239,6 +239,15 @@ export function claudeDistributionFromManifest(
  * `<prefix>_<hash>`), so a content scan falls back over the whole store when
  * the prefix misses.
  *
+ * A prefix match does not guarantee the manifest is there. pnpm creates the
+ * store directory for an optional dependency whose `os`/`cpu` do not match the
+ * host and then leaves it empty — the `@anthropic-ai/claude-agent-sdk-*`
+ * platform payloads on Windows — so a candidate that is ABSENT is skipped
+ * rather than read. Both scans use the same `existsSync` guard, and the guard
+ * is only about absence: a candidate that exists but cannot be parsed still
+ * throws, because a corrupt manifest is a real fault rather than a store that
+ * holds less than it appears to.
+ *
  * @param virtual - the `.pnpm` virtual store directory to scan.
  * @param name - the external package name, exactly as `node_modules` spells it.
  * @param expectedVersion - exact version required when the store retains more than one.
@@ -253,7 +262,9 @@ export function virtualManifest(
   const prefix = `${name.replace('/', '+')}@`
   const entries = readdirSync(virtual)
   for (const entry of entries.filter(dir => dir.startsWith(prefix))) {
-    const manifest = JSON.parse(readFileSync(resolve(virtual, entry, 'node_modules', name, 'package.json'), 'utf8')) as VirtualManifest
+    const candidate = resolve(virtual, entry, 'node_modules', name, 'package.json')
+    if (!existsSync(candidate)) continue
+    const manifest = JSON.parse(readFileSync(candidate, 'utf8')) as VirtualManifest
     if (expectedVersion === undefined || manifest.version === expectedVersion) return manifest
   }
   for (const dir of entries) {
