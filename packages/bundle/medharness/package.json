@@ -46,6 +46,7 @@
     "@deepseek-ai/dsh-llm-deepseek": "workspace:^",
     "@deepseek-ai/dsh-llm-retry": "workspace:^",
     "@deepseek-ai/dsh-medical-case": "workspace:^",
+    "@deepseek-ai/dsh-medical-image": "workspace:^",
     "@deepseek-ai/dsh-plugin-package-inventory-deepseek": "workspace:^",
     "@deepseek-ai/dsh-sandbox-local": "workspace:^",
     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
@@ -63,6 +64,8 @@
     "@deepseek-ai/dsh-tool-medical-case-get": "workspace:^",
     "@deepseek-ai/dsh-tool-medical-case-intake": "workspace:^",
     "@deepseek-ai/dsh-tool-medical-case-update": "workspace:^",
+    "@deepseek-ai/dsh-tool-medical-image-get": "workspace:^",
+    "@deepseek-ai/dsh-tool-medical-image-observe": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^"
   },
   "peerDependencies": {

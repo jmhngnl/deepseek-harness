@@ -82,6 +82,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   fs: 'filesystem.md',
   goals: 'goal.md',
   medicalCase: 'medical-case.md',
+  medicalImage: 'medical-image.md',
   inspector: 'extensions.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
@@ -805,6 +806,9 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   TerminalAttachmentId: 'Browser terminal input ownership is owned by packages/api/terminal-controller/README.md',
   TerminalFrame: 'Browser terminal stream frames are owned by packages/api/terminal-controller/README.md',
   WebTerminalId: 'Browser terminal identity is owned by packages/api/terminal-controller/README.md',
+  ImageObservationRequest: 'Image observation input is owned by packages/medical/medical-image/README.md',
+  ImageObservationResult: 'Image observation outcomes are owned by packages/medical/medical-image/README.md',
+  MedicalImageObservation: 'The image observation record is owned by packages/medical/medical-image/README.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */

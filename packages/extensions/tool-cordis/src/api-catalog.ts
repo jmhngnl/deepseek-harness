@@ -1351,6 +1351,41 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'medicalImage',
+    summary: 'The medical image service (`ctx.medicalImage`), backed exclusively by the owning session log.',
+    description: 'The medical image service (`ctx.medicalImage`), backed exclusively by the owning session log. Every mutation appends a full-state `medical/image-observation` event and returns the resulting authoritative observation; a restatement that changes no recorded field appends no event and keeps the revision.\n\nThe service never reads image bytes and never calls a model. Authorization is answered from the session\'s derived transcript, which is the same surface the model was shown: a caller can only cite an image it could actually have seen.',
+    methods: [
+      {
+        signature: 'list(agent: Agent): readonly MedicalImageObservation[]',
+        description: 'List every observation recorded for one exact live agent, in first-observation order.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'a fresh array; empty when nothing has been observed.',
+        throws: ['{@link MedicalImageError} when the agent is not the registry\'s live instance.'],
+      },
+      {
+        signature: 'get(agent: Agent, attachmentId: string): MedicalImageObservation | undefined',
+        description: 'Read one attachment\'s observation.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'attachmentId', description: 'the attachment to read.' }],
+        returns: 'a fresh view, or `undefined` when this session has not observed it.',
+        throws: ['{@link MedicalImageError} when the agent is not live or the stream is invalid.'],
+      },
+      {
+        signature: 'require(agent: Agent, attachmentId: string): MedicalImageObservation',
+        description: 'Read one attachment\'s observation, failing when this session has none.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'attachmentId', description: 'the attachment to read.' }],
+        returns: 'a fresh view.',
+        throws: ['{@link MedicalImageError} when nothing has been observed for it.'],
+      },
+      {
+        signature: 'observe(agent: Agent, request: ImageObservationRequest): ImageObservationResult',
+        description: 'Record what the model saw in one image the session already holds.\n\nThe canonical reference comes from the session, never from the request: the request carries only the attachment id, and a media type, byte length, or dimension it may also have sent is ignored. An id this session never carried is refused with ImageErrorCodes.IMAGE_ATTACHMENT_NOT_IN_SESSION, which is also the answer for another session\'s attachment — naming the difference would report which ids exist elsewhere.\n\nA restatement that records nothing new is a no-op: no event, no revision change. Any other restatement of the same attachment advances it by one revision, so the revision counts durable changes rather than tool calls.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'the model-supplied observation.' }],
+        returns: 'the authoritative observation and whether it changed.',
+        throws: ['{@link MedicalImageError} when the agent is not live, the attachment is not in this session, or a field cannot be represented durably.'],
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Session-log service; cold operations never construct a Session or Agent.',
     description: 'Session-log service; cold operations never construct a Session or Agent.',
@@ -4564,6 +4599,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
   },
   {
+    name: 'ImageObservationRequest',
+    declaration: 'export interface ImageObservationRequest {\n    readonly attachmentId: string;\n    readonly bodyRegion?: string;\n    readonly findings?: string[];\n    readonly usable: boolean;\n    readonly qualityIssues?: ImageQualityIssue[];\n    readonly uncertainty?: string[];\n}',
+  },
+  {
+    name: 'ImageObservationResult',
+    declaration: 'export interface ImageObservationResult {\n    readonly view: MedicalImageObservation;\n    readonly changed: boolean;\n}',
+  },
+  {
+    name: 'ImageQuality',
+    declaration: 'export interface ImageQuality {\n    readonly usable: boolean;\n    readonly issues: ImageQualityIssue[];\n}',
+  },
+  {
+    name: 'ImageQualityIssue',
+    declaration: 'export type ImageQualityIssue = \'blur\' | \'poor_lighting\' | \'occlusion\' | \'too_distant\' | \'unable_to_assess\';',
+  },
+  {
     name: 'ImageRequestTarget',
     declaration: 'export interface ImageRequestTarget {\n    width: number;\n    height: number;\n    maxBytes: number;\n}',
   },
@@ -4814,6 +4865,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'McpResourceRequest',
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
+  },
+  {
+    name: 'MedicalImageObservation',
+    declaration: 'export interface MedicalImageObservation {\n    readonly attachment: ImageAttachmentRef;\n    readonly revision: number;\n    readonly bodyRegion: string | null;\n    readonly findings: string[];\n    readonly quality: ImageQuality;\n    readonly uncertainty: string[];\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
   },
   {
     name: 'Message',

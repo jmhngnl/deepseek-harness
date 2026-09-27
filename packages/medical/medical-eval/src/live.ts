@@ -33,7 +33,7 @@
  * verbatim and still be reported as the shipped composition. So the runner
  * states what it measured rather than assuming it, and refuses rather than
  * reports loosely: the loaded profile must still compose the shipped bundles,
- * and the booted composition must publish exactly the three medical tools. A
+ * and the booted composition must publish exactly the medical tools this profile ships. A
  * profile whose bundles were edited, or a composition that gained a fourth
  * tool, fails the run rather than silently widening what the numbers below
  * describe. Neither guard repairs anything — an edited profile is a refusal,
@@ -85,6 +85,8 @@ export const LIVE_MEDICAL_TOOLS: readonly string[] = [
   'medical_case_get',
   'medical_case_intake',
   'medical_case_update',
+  'medical_image_get',
+  'medical_image_observe',
 ]
 
 /**

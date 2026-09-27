@@ -1,5 +1,6 @@
 # The `medical` agent preset: a medical intake agent whose entire tool surface is
-# the three case tools.
+# the five medical tools — three for the patient-reported case, two for the
+# model-observed image evidence.
 #
 # A preset decides an agent's model-facing tools in a profile that governs tools
 # per agent rather than per host — which is what the Web profile does. There the
@@ -30,6 +31,11 @@
       for whatever is still missing. You do not diagnose, prescribe, or assess risk, and you never
       state a medical conclusion. Record only what the user tells you; never invent a fact, a value,
       or a measurement, and never guess at a fact the tools report as missing.
+      When an image is present, record only what is directly visible in it with medical_image_observe,
+      together with the image's quality limitations and whatever you could not determine. Do not
+      diagnose disease from an image. What you see in an image is your own observation, never a
+      patient-reported symptom: never restate it as something the user told you, and never use it to
+      fill a case field. If an image cannot be assessed reliably, say so and ask for a clearer one.
     complete: true
     includeRuntimeContext: false
 
@@ -47,3 +53,15 @@
 # durable session state rather than its conversation history.
 - id: tool-medical-case-get
   name: '@deepseek-ai/dsh-tool-medical-case-get'
+
+# Records the directly visible properties of one image the user attached, with the
+# image's quality limits and what could not be determined. The harness resolves the
+# attachment id against this session and stores its own canonical reference, so a
+# model cannot cite an image that was never attached here.
+- id: tool-medical-image-observe
+  name: '@deepseek-ai/dsh-tool-medical-image-observe'
+
+# Reads those observations back, addressed by attachment, so a session holding
+# several images keeps them apart instead of exposing only the latest.
+- id: tool-medical-image-get
+  name: '@deepseek-ai/dsh-tool-medical-image-get'

@@ -1837,6 +1837,9 @@ importers:
       '@deepseek-ai/dsh-medical-case':
         specifier: workspace:^
         version: link:../../medical/medical-case
+      '@deepseek-ai/dsh-medical-image':
+        specifier: workspace:^
+        version: link:../../medical/medical-image
       '@deepseek-ai/dsh-plugin-package-inventory-deepseek':
         specifier: workspace:^
         version: link:../../llm/plugin-package-inventory-deepseek
@@ -1888,6 +1891,12 @@ importers:
       '@deepseek-ai/dsh-tool-medical-case-update':
         specifier: workspace:^
         version: link:../../medical/tool-medical-case-update
+      '@deepseek-ai/dsh-tool-medical-image-get':
+        specifier: workspace:^
+        version: link:../../medical/tool-medical-image-get
+      '@deepseek-ai/dsh-tool-medical-image-observe':
+        specifier: workspace:^
+        version: link:../../medical/tool-medical-image-observe
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
@@ -8339,6 +8348,46 @@ importers:
         specifier: workspace:^
         version: link:../../util/values
 
+  packages/medical/medical-image:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@deepseek-ai/dsh-attachment-local':
+        specifier: workspace:^
+        version: link:../../attachment/attachment-local
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-medical-case':
+        specifier: workspace:^
+        version: link:../medical-case
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+
   packages/medical/tool-medical-case-get:
     devDependencies:
       '@deepseek-ai/cordis':
@@ -8431,6 +8480,78 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
+  packages/medical/tool-medical-image-get:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-medical-image':
+        specifier: workspace:^
+        version: link:../medical-image
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
+  packages/medical/tool-medical-image-observe:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-medical-image':
+        specifier: workspace:^
+        version: link:../medical-image
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
@@ -12344,6 +12465,12 @@ importers:
       '@deepseek-ai/dsh-mcp-client':
         specifier: workspace:^
         version: link:../../packages/mcp/mcp-client
+      '@deepseek-ai/dsh-medical-case':
+        specifier: workspace:^
+        version: link:../../packages/medical/medical-case
+      '@deepseek-ai/dsh-medical-image':
+        specifier: workspace:^
+        version: link:../../packages/medical/medical-image
       '@deepseek-ai/dsh-output-retention':
         specifier: workspace:^
         version: link:../../packages/util/output-retention
@@ -12506,6 +12633,21 @@ importers:
       '@deepseek-ai/dsh-tool-jobs':
         specifier: workspace:^
         version: link:../../packages/jobs/tool-jobs
+      '@deepseek-ai/dsh-tool-medical-case-get':
+        specifier: workspace:^
+        version: link:../../packages/medical/tool-medical-case-get
+      '@deepseek-ai/dsh-tool-medical-case-intake':
+        specifier: workspace:^
+        version: link:../../packages/medical/tool-medical-case-intake
+      '@deepseek-ai/dsh-tool-medical-case-update':
+        specifier: workspace:^
+        version: link:../../packages/medical/tool-medical-case-update
+      '@deepseek-ai/dsh-tool-medical-image-get':
+        specifier: workspace:^
+        version: link:../../packages/medical/tool-medical-image-get
+      '@deepseek-ai/dsh-tool-medical-image-observe':
+        specifier: workspace:^
+        version: link:../../packages/medical/tool-medical-image-observe
       '@deepseek-ai/dsh-tool-present':
         specifier: workspace:^
         version: link:../../packages/fs/tool-present

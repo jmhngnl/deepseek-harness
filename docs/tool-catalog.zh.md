@@ -40,6 +40,8 @@
 | `@deepseek-ai/dsh-tool-medical-case-intake` | `medical_case_intake` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`medical/case-change for accepted records`、`tool/result` | - | 把用户主动提供的病例基本信息（症状、病程、年龄、可选备注）记录进本会话的持久病例，并列出仍然缺失的必填字段。无参数调用合法，会把每个必填字段报告为缺失；参数类型错误只是普通工具错误。该工具不做诊断、不推荐治疗或药物，也不给出医学风险结论。 |
 | `@deepseek-ai/dsh-tool-medical-case-update` | `medical_case_update` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`medical/case-change for accepted changes`、`tool/result` | - | 对会话已记录的病例应用一次增量变更。省略的字段保持原值，且没有任何参数会清空字段：空症状列表与空白字符串都会被拒绝。symptoms 不能与 symptomsAdd 或 symptomsRemove 同时出现，同一症状也不能既添加又删除。没有造成任何变化的 patch 不追加事件，也不推进修订号。 |
 | `@deepseek-ai/dsh-tool-medical-case-get` | `medical_case_get` | `ctx.tools`、`ctx.agents`、`ctx.medicalCase` | `tool/call`、`tool/result` | - | 只读地返回本会话的权威病例记录与仍然缺失的必填字段。记录来自持久会话日志而不是对话记忆，因此能跨恢复与 fork 存活。会话尚未记录病例时调用失败。 |
+| `@deepseek-ai/dsh-tool-medical-image-observe` | `medical_image_observe` | `ctx.tools`、`ctx.agents`、`ctx.medicalImage` | `tool/call`、`tool/result` | - | 记录模型能在用户附加的图像中直接看到的内容：部位、可见发现、图像质量限制，以及无法判定的部分。harness 会对着本会话解析 attachment id，并存储它自己的 canonical 引用，因此模型无法引用一张从未在此附加过的图像。不给出诊断、治疗或风险。 |
+| `@deepseek-ai/dsh-tool-medical-image-get` | `medical_image_get` | `ctx.tools`、`ctx.agents`、`ctx.medicalImage` | `tool/call`、`tool/result` | - | 按附件读取本会话已经记录的图像观察，因此持有多个图像的会话能把它们区分开，而不是只暴露最新的一张。只读调用方自己的会话，且不改变任何东西。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -1749,6 +1751,94 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 来源：[`packages/medical/tool-medical-case-get/src/index.ts`](../packages/medical/tool-medical-case-get/src/index.ts)
 
 只读地返回本会话的权威病例记录与仍然缺失的必填字段。记录来自持久会话日志而不是对话记忆，因此能跨恢复与 fork 存活。会话尚未记录病例时调用失败。
+
+<a id="deepseek-aidsh-tool-medical-image-observe"></a>
+
+## `@deepseek-ai/dsh-tool-medical-image-observe`
+
+### `medical_image_observe`
+
+记录你能在用户附加到本对话的图像中**直接看到**的内容。看过图之后，每张图调用一次。传入图片旁显示的 attachmentId；harness 会对着本会话解析它，并拒绝不是在此附加的 id。只记录可见属性：部位、颜色、形状、大小、分布、表面外观、肿胀、变色，或图中任何你能指出的东西。陈述图像限制（模糊、光线不足、遮挡、过远、无法评估）以及你无法判定的内容。如果图像无法被可靠评估，把 usable 置为 false 并说明原因，而不是去猜。不要给出诊断、不要命名疾病或病症、不要建议治疗或药物、不要给出风险、紧急度或分诊判断：本工具记录的是可见证据，不是临床结论。不要把这些发现重述为患者陈述的症状；病例记录只会根据用户所说更新。重复同一条观察是 no-op，不会产生新的修订号。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "attachmentId": {
+      "type": "string",
+      "description": "The attachment id shown beside the image in this conversation. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
+    },
+    "bodyRegion": {
+      "type": "string",
+      "description": "The body region the image shows, as you would describe it (for example \"left forearm\"). Omit when you cannot tell."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Directly visible findings, one short phrase each (for example \"irregular red patch\", \"raised border\", \"dry flaking surface\"). Pass an empty array or omit when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "usable": {
+      "type": "boolean",
+      "description": "Whether any part of the image could be described. Pass false when the image cannot be assessed reliably, and list the quality issues that prevented it."
+    },
+    "qualityIssues": {
+      "type": "array",
+      "description": "Image limitations you observed. Omit when the image has none.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "blur",
+          "poor_lighting",
+          "occlusion",
+          "too_distant",
+          "unable_to_assess"
+        ]
+      }
+    },
+    "uncertainty": {
+      "type": "array",
+      "description": "What you could not determine from this image (for example \"depth cannot be judged from a single view\"). Omit when there is nothing you are unsure about.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "attachmentId",
+    "usable"
+  ]
+}
+```
+
+来源： [`packages/medical/tool-medical-image-observe/src/index.ts`](../packages/medical/tool-medical-image-observe/src/index.ts)
+
+记录模型能在用户附加的图像中直接看到的内容：部位、可见发现、图像质量限制，以及无法判定的部分。harness 会对着本会话解析 attachment id，并存储它自己的 canonical 引用，因此模型无法引用一张从未在此附加过的图像。不给出诊断、治疗或风险。
+
+<a id="deepseek-aidsh-tool-medical-image-get"></a>
+
+## `@deepseek-ai/dsh-tool-medical-image-get`
+
+### `medical_image_get`
+
+读取本会话已经记录的图像观察，不做任何变更。传入 attachmentId 可读取某一张图，省略则列出本对话中观察过的全部图像。用它重新核对某张图记录了什么——例如一段长对话之后，或你不确定某张图是否已被观察时。返回的观察是权威的：它们来自会话的持久状态，而不是对话记忆。它们只是对图像的观察——永远不是患者陈述的事实，读取它们也不会改变病例记录。该工具只做读取与结构化：它不诊断疾病、不推荐治疗或药物，也不评估医学风险。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "attachmentId": {
+      "type": "string",
+      "description": "The attachment id to read. Omit to list every image observed in this conversation. An id this session has no observation for is reported as such."
+    }
+  }
+}
+```
+
+来源： [`packages/medical/tool-medical-image-get/src/index.ts`](../packages/medical/tool-medical-image-get/src/index.ts)
+
+按附件读取本会话已经记录的图像观察，因此持有多个图像的会话能把它们区分开，而不是只暴露最新的一张。只读调用方自己的会话，且不改变任何东西。
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

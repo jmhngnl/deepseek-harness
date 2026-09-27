@@ -19,6 +19,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import GoalService from '@deepseek-ai/dsh-goal'
 import MedicalCaseService from '@deepseek-ai/dsh-medical-case'
+import MedicalImageService from '@deepseek-ai/dsh-medical-image'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
@@ -60,6 +61,8 @@ import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import * as ToolMedicalCaseIntake from '@deepseek-ai/dsh-tool-medical-case-intake'
 import * as ToolMedicalCaseUpdate from '@deepseek-ai/dsh-tool-medical-case-update'
 import * as ToolMedicalCaseGet from '@deepseek-ai/dsh-tool-medical-case-get'
+import * as ToolMedicalImageGet from '@deepseek-ai/dsh-tool-medical-image-get'
+import * as ToolMedicalImageObserve from '@deepseek-ai/dsh-tool-medical-image-observe'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
@@ -504,6 +507,34 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'Reads the session\u2019s authoritative case record and the required fields still missing, without changing either. The record comes from the durable session log rather than conversation memory, so it survives resume and fork. Fails when the session has recorded no case yet.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-medical-image-observe',
+    dir: 'tool-medical-image-observe',
+    source: 'packages/medical/tool-medical-image-observe/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.medicalImage'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(MedicalImageService)
+      await ctx.plugin(ToolMedicalImageObserve)
+    },
+    note:
+      'Records what the model can directly see in an image the user attached: body region, visible findings, image quality limits, and what could not be determined. The harness resolves the attachment id against this session and stores its own canonical reference, so a model cannot cite an image that was never attached here. States no diagnosis, treatment, or risk.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-medical-image-get',
+    dir: 'tool-medical-image-get',
+    source: 'packages/medical/tool-medical-image-get/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.medicalImage'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(MedicalImageService)
+      await ctx.plugin(ToolMedicalImageGet)
+    },
+    note:
+      'Reads the image observations this session has already recorded, addressed by attachment, so a session holding several images keeps them apart instead of exposing only the latest. Reads only the calling session and changes nothing.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

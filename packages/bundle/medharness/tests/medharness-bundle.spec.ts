@@ -26,7 +26,13 @@ const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const INSTALL_ANCHOR = fileURLToPath(new URL('../../../../apps/cli/package.json', import.meta.url))
 
 /** The whole model-facing surface this runtime is allowed to publish. */
-const MEDICAL_TOOLS = ['medical_case_get', 'medical_case_intake', 'medical_case_update']
+const MEDICAL_TOOLS = [
+  'medical_case_get',
+  'medical_case_intake',
+  'medical_case_update',
+  'medical_image_get',
+  'medical_image_observe',
+]
 
 /** Rows whose presence would mean a coding-agent capability leaked in. */
 const CODING_TOOLS = ['bash', 'pwsh', 'read', 'write', 'edit', 'glob', 'grep', 'read_image',
@@ -34,8 +40,15 @@ const CODING_TOOLS = ['bash', 'pwsh', 'read', 'write', 'edit', 'glob', 'grep', '
   'update_goal', 'web_search', 'web_fetch', 'workflow', 'ralph', 'skill', 'subagent',
   'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents']
 
-/** A generous ceiling: the measured surface is ~1,133 tokens. */
-const TOKEN_BUDGET = 1500
+/**
+ * A generous ceiling. The three-tool surface measured ~1,133 tokens; the
+ * five-tool surface Phase 4A adds measures ~2,087, because the image tools carry
+ * the visible-evidence boundary in their own descriptions — that is where a model
+ * reads it, immediately before calling them. The ceiling leaves roughly a quarter
+ * of headroom for wording edits while still catching a row that widens the
+ * request without anyone deciding to.
+ */
+const TOKEN_BUDGET = 2600
 
 /**
  * Booting the real Loader here pulls this bundle's ~30 workspace packages
@@ -112,14 +125,17 @@ describe('dsh-medharness bundle', () => {
     )
   })
 
-  it('mounts the medical domain and its three tools, and nothing else model-facing', async () => {
+  it('mounts the two medical domains and their five tools, and nothing else model-facing', async () => {
     const rows = declaredRows()
     const medical = rows.filter(row => (row.name ?? '').includes('medical'))
     expect(medical.map(row => row.id).sort()).toEqual([
       'medical-case',
+      'medical-image',
       'tool-medical-case-get',
       'tool-medical-case-intake',
       'tool-medical-case-update',
+      'tool-medical-image-get',
+      'tool-medical-image-observe',
     ])
     expect(rows.filter(row => row.disabled !== undefined)).toEqual([])
     // Telemetry must be ABSENT, not disabled: a composition without the row
@@ -153,7 +169,7 @@ describe('medharness profile surface', () => {
     await ctx?.fiber.dispose()
   })
 
-  it('publishes exactly the three medical tools', async () => {
+  it('publishes exactly the five medical tools', async () => {
     // What is booted is this bundle's own patch layer, inside the real
     // `medharness` profile directory so the module fallback the launcher heals
     // is the one that resolves the rows. The profile's other layer —
@@ -238,13 +254,15 @@ describe('medical agent preset', () => {
     expect(presets.map(preset => preset.id)).toContain('medical')
   }, DISCOVERY_TIMEOUT)
 
-  it('mounts exactly the three medical tools for an agent', async () => {
+  it('mounts exactly the five medical tools for an agent', async () => {
     const rows = await presetRows('medical')
     const toolRows = rows.filter(row => (row.name ?? '').includes('tool-'))
     expect(toolRows.map(row => row.name)).toEqual([
       '@deepseek-ai/dsh-tool-medical-case-intake',
       '@deepseek-ai/dsh-tool-medical-case-update',
       '@deepseek-ai/dsh-tool-medical-case-get',
+      '@deepseek-ai/dsh-tool-medical-image-observe',
+      '@deepseek-ai/dsh-tool-medical-image-get',
     ])
     // The persona is the COMPLETE prompt, so no later assembly listener can
     // describe capabilities this agent does not have.
@@ -252,6 +270,11 @@ describe('medical agent preset', () => {
       complete: true,
       includeRuntimeContext: false,
     })
+    // The prompt states the visible-evidence boundary, which is what keeps a
+    // finding from being restated as something the patient said.
+    const persona = (rows.find(row => row.id === 'persona')?.config as { prefix?: string } | undefined)?.prefix ?? ''
+    expect(persona).toContain('directly visible')
+    expect(persona).toContain('never a patient-reported symptom')
     expect(rows.some(row => row.disabled !== undefined)).toBe(false)
   }, DISCOVERY_TIMEOUT)
 

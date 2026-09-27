@@ -27,8 +27,9 @@
 #   * `mcp-resources`. External tools are a later phase, and an unconfigured MCP
 #     surface only widens the request.
 #   * `user-questions`. It registers `ask_user_question`, and the medical
-#     surface is exactly three tools. The tools already report their missing
-#     fields, which is how the agent asks.
+#     surface is exactly the five medical tools below. The case tools already
+#     report their missing fields, which is how the agent asks for facts, and an
+#     unusable image is reported through the observation's own quality block.
 #
 # Rows are ordered for readers, not for activation: activation is driven by
 # service availability, so the loader settles the real order. Every row here is a
@@ -160,7 +161,13 @@
           You are a medical intake assistant powered by the {{model}} model.
         personaSuffix: >-
           You record the facts a user states about their case and ask for whatever is still missing.
-          You do not diagnose, prescribe, or assess risk, and you never state a medical conclusion.
+          When an image is present, record only what is directly visible in it with
+          medical_image_observe, together with the image's quality limitations and whatever you could not determine.
+          Do not diagnose disease from an image, do not prescribe or assess risk from one, and never state a
+          medical conclusion.
+          What you see in an image is your own observation, not a patient-reported symptom: never restate it as
+          something the user told you, and never use it to fill a case field.
+          If an image cannot be assessed reliably, say so and ask for a clearer one.
 
     - id: agent
       name: '@deepseek-ai/dsh-agent'
@@ -197,3 +204,31 @@
     # consults durable session state instead of its conversation history.
     - id: tool-medical-case-get
       name: '@deepseek-ai/dsh-tool-medical-case-get'
+
+    # ── Observed visual evidence ────────────────────────────────────────────
+    #
+    # A SECOND medical domain, deliberately separate from the case. The case
+    # records what the PATIENT reported; this records what the MODEL saw in an
+    # image. Nothing here can reach a case field: a visible finding never becomes
+    # a reported symptom, and the two domains own different session events.
+    #
+    # No row in this section reads image bytes or calls a model. The model has
+    # already looked at the image — that is why the image was in its request — and
+    # the `llm-deepseek` row above already carries image-capable models
+    # (`deepseek-flash` declares the `image` input modality). These rows only
+    # record, validate, and read back what the model said it saw.
+    - id: medical-image
+      name: '@deepseek-ai/dsh-medical-image'
+
+    # Records the directly visible properties of one image the user attached:
+    # body region, visible findings, image quality limits, and what could not be
+    # determined. The harness resolves the attachment id against this session and
+    # stores its own canonical reference, so a model cannot cite an image that was
+    # never attached here. It states no diagnosis, no treatment, and no risk.
+    - id: tool-medical-image-observe
+      name: '@deepseek-ai/dsh-tool-medical-image-observe'
+
+    # Reads those observations back, addressed by attachment, so a session holding
+    # several images keeps them apart instead of exposing only the latest.
+    - id: tool-medical-image-get
+      name: '@deepseek-ai/dsh-tool-medical-image-get'

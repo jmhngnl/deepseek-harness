@@ -213,7 +213,7 @@ describe('the statements a live report makes about itself', () => {
 })
 
 describe('the surface guard', () => {
-  it('accepts exactly the three medical tools, in any order', () => {
+  it('accepts exactly the medical tools, in any order', () => {
     expect(() => { assertMedicalSurface([...LIVE_MEDICAL_TOOLS].reverse()) }).not.toThrow()
   })
 
@@ -359,7 +359,7 @@ describe('a booted live run', () => {
     expect(result.path).toBe(join(root, '.medharness', 'eval-runs', `${result.report.runId}.json`))
     expect(existsSync(result.path)).toBe(true)
     // The case passed against the SHIPPED composition: the surface guard above
-    // would have refused a runtime that published anything but the three tools.
+    // would have refused a runtime that published anything but the medical tools.
     expect(result.report.cases.map(reported => reported.id)).toEqual(['intake-complete-first-contact'])
     expect(result.report.cases[0]?.failures).toEqual([])
     expect(result.report.summary.casesPassed).toBe(1)

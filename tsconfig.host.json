@@ -384,9 +384,12 @@
     { "path": "./packages/lsp/tool-lsp" },
     { "path": "./packages/medical/medical-case" },
     { "path": "./packages/medical/medical-eval" },
+    { "path": "./packages/medical/medical-image" },
     { "path": "./packages/medical/tool-medical-case-get" },
     { "path": "./packages/medical/tool-medical-case-intake" },
     { "path": "./packages/medical/tool-medical-case-update" },
+    { "path": "./packages/medical/tool-medical-image-get" },
+    { "path": "./packages/medical/tool-medical-image-observe" },
     { "path": "./apps/cli" },
     { "path": "./apps/desktop-host" },
     { "path": "./apps/desktop" }

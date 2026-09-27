@@ -36,6 +36,8 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-medical-case-intake` | `medical_case_intake` | `ctx.tools`, `ctx.agents`, `ctx.medicalCase` | `tool/call`, `medical/case-change for accepted records`, `tool/result` | - | Structures the case basics a user volunteers (symptoms, duration, age, optional notes) and lists the required fields still missing. A call with no arguments is valid and reports every required field as missing; wrong argument types are ordinary tool errors. It performs no diagnosis, recommends no treatment or medication, and states no medical risk conclusion. |
 | `@deepseek-ai/dsh-tool-medical-case-update` | `medical_case_update` | `ctx.tools`, `ctx.agents`, `ctx.medicalCase` | `tool/call`, `medical/case-change for accepted changes`, `tool/result` | - | Applies one incremental change to the session’s recorded case. An omitted field keeps its value, and no parameter clears one: an empty symptom list or a blank string is rejected. symptoms cannot be combined with symptomsAdd or symptomsRemove, and one symptom cannot be both added and removed. A patch that changes nothing appends no event and keeps the revision. |
 | `@deepseek-ai/dsh-tool-medical-case-get` | `medical_case_get` | `ctx.tools`, `ctx.agents`, `ctx.medicalCase` | `tool/call`, `tool/result` | - | Reads the session’s authoritative case record and the required fields still missing, without changing either. The record comes from the durable session log rather than conversation memory, so it survives resume and fork. Fails when the session has recorded no case yet. |
+| `@deepseek-ai/dsh-tool-medical-image-observe` | `medical_image_observe` | `ctx.tools`, `ctx.agents`, `ctx.medicalImage` | `tool/call`, `tool/result` | - | Records what the model can directly see in an image the user attached: body region, visible findings, image quality limits, and what could not be determined. The harness resolves the attachment id against this session and stores its own canonical reference, so a model cannot cite an image that was never attached here. States no diagnosis, treatment, or risk. |
+| `@deepseek-ai/dsh-tool-medical-image-get` | `medical_image_get` | `ctx.tools`, `ctx.agents`, `ctx.medicalImage` | `tool/call`, `tool/result` | - | Reads the image observations this session has already recorded, addressed by attachment, so a session holding several images keeps them apart instead of exposing only the latest. Reads only the calling session and changes nothing. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -1743,6 +1745,94 @@ Read the case record this session has already recorded, without changing it. Use
 Source: [`packages/medical/tool-medical-case-get/src/index.ts`](../packages/medical/tool-medical-case-get/src/index.ts)
 
 Reads the session’s authoritative case record and the required fields still missing, without changing either. The record comes from the durable session log rather than conversation memory, so it survives resume and fork. Fails when the session has recorded no case yet.
+
+<a id="deepseek-aidsh-tool-medical-image-observe"></a>
+
+## `@deepseek-ai/dsh-tool-medical-image-observe`
+
+### `medical_image_observe`
+
+Record what you can DIRECTLY SEE in an image the user attached to this conversation. Use it once per image, after you have looked at the image. Pass the attachmentId shown beside the image in the conversation; the harness resolves it against this session and rejects an id that was not attached here. Record only visible properties: body region, colour, shape, size, distribution, surface appearance, swelling, discoloration, or anything else you can point at in the picture. State image limitations (blur, poor lighting, occlusion, too distant, unable to assess) and what you could not determine. If the image cannot be assessed reliably, set usable to false and say why rather than guessing. Do NOT state a diagnosis, name a disease or condition, suggest treatment or medication, or give a risk, urgency, or triage judgement: this tool records visible evidence, not a clinical conclusion. Do NOT restate these findings as patient-reported symptoms; the case record is updated only from what the user says. Repeating the same observation is a no-op and does not create a new revision.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "attachmentId": {
+      "type": "string",
+      "description": "The attachment id shown beside the image in this conversation. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
+    },
+    "bodyRegion": {
+      "type": "string",
+      "description": "The body region the image shows, as you would describe it (for example \"left forearm\"). Omit when you cannot tell."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Directly visible findings, one short phrase each (for example \"irregular red patch\", \"raised border\", \"dry flaking surface\"). Pass an empty array or omit when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "usable": {
+      "type": "boolean",
+      "description": "Whether any part of the image could be described. Pass false when the image cannot be assessed reliably, and list the quality issues that prevented it."
+    },
+    "qualityIssues": {
+      "type": "array",
+      "description": "Image limitations you observed. Omit when the image has none.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "blur",
+          "poor_lighting",
+          "occlusion",
+          "too_distant",
+          "unable_to_assess"
+        ]
+      }
+    },
+    "uncertainty": {
+      "type": "array",
+      "description": "What you could not determine from this image (for example \"depth cannot be judged from a single view\"). Omit when there is nothing you are unsure about.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "attachmentId",
+    "usable"
+  ]
+}
+```
+
+Source: [`packages/medical/tool-medical-image-observe/src/index.ts`](../packages/medical/tool-medical-image-observe/src/index.ts)
+
+Records what the model can directly see in an image the user attached: body region, visible findings, image quality limits, and what could not be determined. The harness resolves the attachment id against this session and stores its own canonical reference, so a model cannot cite an image that was never attached here. States no diagnosis, treatment, or risk.
+
+<a id="deepseek-aidsh-tool-medical-image-get"></a>
+
+## `@deepseek-ai/dsh-tool-medical-image-get`
+
+### `medical_image_get`
+
+Read the image observations this session has already recorded, without changing them. Pass an attachmentId to read one image, or omit it to list every image observed in this conversation. Use it to re-check what was recorded about a specific image, for example after a long conversation or when you are unsure whether an image was already observed. The returned observations are authoritative: they come from the session’s durable state, not from conversation memory. They are observations of images only — they are never patient-reported facts, and reading them does not change the case record. This tool reads and structures input only: it does not diagnose a condition, recommend treatment or medication, or assess medical risk.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "attachmentId": {
+      "type": "string",
+      "description": "The attachment id to read. Omit to list every image observed in this conversation. An id this session has no observation for is reported as such."
+    }
+  }
+}
+```
+
+Source: [`packages/medical/tool-medical-image-get/src/index.ts`](../packages/medical/tool-medical-image-get/src/index.ts)
+
+Reads the image observations this session has already recorded, addressed by attachment, so a session holding several images keeps them apart instead of exposing only the latest. Reads only the calling session and changes nothing.
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

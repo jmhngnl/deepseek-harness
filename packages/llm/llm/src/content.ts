@@ -212,10 +212,14 @@ function base64Length(bytes: number): number {
 /**
  * Visit every image occurrence of typed content in message order, including
  * nested tool-result content.
+ *
+ * Exported because the nesting rule is a contract, not an implementation detail:
+ * a consumer that walks content itself can silently diverge on nesting depth and
+ * then disagree with every other image policy about what a message contains.
  * @param content - typed model content blocks.
- * @param visit - called once per occurrence.
+ * @param visit - called once per occurrence, in message order.
  */
-function visitImageBlocks(content: readonly ContentBlock[], visit: (block: ImageBlock) => void): void {
+export function visitImageBlocks(content: readonly ContentBlock[], visit: (block: ImageBlock) => void): void {
   for (const block of content) {
     if (block.type === 'image') visit(block)
     else if (block.type === 'tool-result') visitImageBlocks(block.content, visit)

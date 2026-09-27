@@ -3,7 +3,7 @@
  *
  * This package is test infrastructure, not a capability. It registers no tool,
  * publishes no service, and mounts nothing into an agent's runtime: the
- * medical agent's model-facing surface stays exactly the three
+ * medical agent's model-facing surface stays exactly the medical
  * `medical_case_*` tools. What it adds is a way to state what a medical
  * conversation must do — as versioned data rather than as assertions buried in
  * a test — and to replay that statement through the real agent loop against
