@@ -15,6 +15,7 @@ import {
   emptyMedicalImageFoldState,
   foldMedicalImage,
   imageReplayError,
+  sameAttachmentRef,
 } from '../src/fold.ts'
 import type { MedicalImageFoldState } from '../src/fold.ts'
 import type { MedicalImageChangeMeta } from '../src/domain.ts'
@@ -254,6 +255,153 @@ describe('applyMedicalImageChange', () => {
     expect(stored.map(entry => String(entry.attachment.attachmentId))).toEqual([String(ATTACHMENT), String(other)])
     expect(stored[0]?.revision).toBe(2)
     expect(stored[1]?.revision).toBe(1)
+  })
+})
+
+describe('canonical attachment identity across an update', () => {
+  /**
+   * The reference the projection holds: every optional field is present, so the
+   * comparison has something to disagree with on each of them.
+   */
+  const STORED: MedicalImageObservation['attachment'] = {
+    attachmentId: ATTACHMENT,
+    mediaType: 'image/png',
+    bytes: 2_048,
+    width: 640,
+    height: 480,
+    name: 'rash.png',
+    originalDimensions: { width: 1_280, height: 960 },
+  }
+
+  /** A state holding one observation of {@link STORED}. */
+  function seeded(): MedicalImageFoldState {
+    const state = emptyMedicalImageFoldState()
+    applyMedicalImageChange(state, change({ attachment: STORED }))
+    return state
+  }
+
+  /** The stored reference with exactly one field rewritten. */
+  function rewritten(field: string, value: unknown): MedicalImageObservation['attachment'] {
+    return { ...STORED, [field]: value }
+  }
+
+  /**
+   * Every corruption case ALSO changes a finding. Without that, the rejection
+   * could come from the "update must change at least one recorded field" rule
+   * instead of from the identity rule this suite exists to pin.
+   */
+  function corrupted(state: MedicalImageFoldState, attachment: MedicalImageObservation['attachment']): string {
+    return foldFailure(state, change({
+      revision: 2,
+      updatedAt: 2_000,
+      findings: ['irregular red patch', 'scaling'],
+      attachment,
+    }, 'update'))
+  }
+
+  it('refuses an update that rewrites the media type', () => {
+    expect(corrupted(seeded(), rewritten('mediaType', 'image/gif')))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that rewrites the byte length', () => {
+    expect(corrupted(seeded(), rewritten('bytes', 1)))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that rewrites the width', () => {
+    expect(corrupted(seeded(), rewritten('width', 1)))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that rewrites the height', () => {
+    expect(corrupted(seeded(), rewritten('height', 1)))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that rewrites the display name', () => {
+    expect(corrupted(seeded(), rewritten('name', 'forged.gif')))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that drops a display name', () => {
+    const withoutName = { ...STORED } as Record<string, unknown>
+    delete withoutName['name']
+    expect(corrupted(seeded(), withoutName as unknown as MedicalImageObservation['attachment']))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that rewrites the original dimensions', () => {
+    expect(corrupted(seeded(), rewritten('originalDimensions', { width: 1, height: 1 })))
+      .toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('refuses an update that adds original dimensions the stored reference lacked', () => {
+    const withoutDimensions = { ...STORED } as Record<string, unknown>
+    delete withoutDimensions['originalDimensions']
+    const state = emptyMedicalImageFoldState()
+    applyMedicalImageChange(state, change({
+      attachment: withoutDimensions as unknown as MedicalImageObservation['attachment'],
+    }))
+    expect(corrupted(state, STORED)).toMatch(/cannot change the canonical attachment reference/)
+  })
+
+  it('accepts an update that leaves the reference identical and changes only the observation', () => {
+    const state = seeded()
+    applyMedicalImageChange(state, change({
+      revision: 2,
+      updatedAt: 2_000,
+      findings: ['irregular red patch', 'scaling'],
+      bodyRegion: 'right forearm',
+      quality: { usable: false, issues: ['blur'] },
+      uncertainty: ['depth unclear'],
+      attachment: STORED,
+    }, 'update'))
+    const stored = state.observations.get(String(ATTACHMENT))
+    expect(stored?.revision).toBe(2)
+    expect(stored?.findings).toEqual(['irregular red patch', 'scaling'])
+    expect(stored?.bodyRegion).toBe('right forearm')
+    expect(stored?.attachment).toEqual(STORED)
+  })
+})
+
+describe('sameAttachmentRef', () => {
+  const BASE: MedicalImageObservation['attachment'] = {
+    attachmentId: ATTACHMENT,
+    mediaType: 'image/png',
+    bytes: 2_048,
+    width: 640,
+    height: 480,
+  }
+
+  it('accepts the same reference and the same object', () => {
+    expect(sameAttachmentRef(BASE, BASE)).toBe(true)
+    expect(sameAttachmentRef(BASE, { ...BASE })).toBe(true)
+  })
+
+  it('rejects a different attachment id', () => {
+    expect(sameAttachmentRef(BASE, { ...BASE, attachmentId: AttachmentId('sha256:other') })).toBe(false)
+  })
+
+  it('treats an absent optional field as a value, not as a wildcard', () => {
+    expect(sameAttachmentRef(BASE, { ...BASE, name: 'a.png' })).toBe(false)
+    expect(sameAttachmentRef({ ...BASE, name: 'a.png' }, BASE)).toBe(false)
+    expect(sameAttachmentRef({ ...BASE, name: 'a.png' }, { ...BASE, name: 'a.png' })).toBe(true)
+    expect(sameAttachmentRef(
+      { ...BASE, originalDimensions: { width: 2, height: 2 } },
+      { ...BASE, originalDimensions: { width: 2, height: 3 } },
+    )).toBe(false)
+    expect(sameAttachmentRef(
+      { ...BASE, originalDimensions: { width: 2, height: 2 } },
+      { ...BASE, originalDimensions: { width: 2, height: 2 } },
+    )).toBe(true)
+  })
+
+  it('rejects every numeric field that differs', () => {
+    for (const field of ['bytes', 'width', 'height'] as const) {
+      expect(sameAttachmentRef(BASE, { ...BASE, [field]: BASE[field] + 1 })).toBe(false)
+    }
+    expect(sameAttachmentRef(BASE, { ...BASE, mediaType: 'image/webp' })).toBe(false)
   })
 })
 

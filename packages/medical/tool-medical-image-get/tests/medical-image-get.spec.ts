@@ -12,6 +12,7 @@ import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import MedicalImageService from '@deepseek-ai/dsh-medical-image'
+import type { ImageObservationRequest } from '@deepseek-ai/dsh-medical-image'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as ToolMedicalImageGet from '../src/index.ts'
@@ -34,6 +35,19 @@ const KNEE: ImageAttachmentRef = {
   bytes: 512,
   width: 320,
   height: 240,
+}
+
+/** One COMPLETE observation request; the contract is a full snapshot, not a patch. */
+function observation(attachmentId: string, overrides: Partial<ImageObservationRequest> = {}): ImageObservationRequest {
+  return {
+    attachmentId,
+    bodyRegion: null,
+    findings: [],
+    usable: true,
+    qualityIssues: [],
+    uncertainty: [],
+    ...overrides,
+  }
 }
 
 interface Harness {
@@ -108,14 +122,12 @@ describe('medical_image_get reads the authoritative observations', () => {
 
   it('reads one attachment by id', async () => {
     const harness = await setup()
-    harness.ctx.medicalImage.observe(harness.agent, {
-      attachmentId: String(RASH.attachmentId),
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId), {
       bodyRegion: 'left forearm',
       findings: ['irregular red patch'],
-      usable: true,
       qualityIssues: ['blur'],
       uncertainty: ['depth cannot be judged from one view'],
-    })
+    }))
     const result = await harness.execute({ attachmentId: String(RASH.attachmentId) })
 
     expect(result.isError).toBe(false)
@@ -138,16 +150,13 @@ describe('medical_image_get reads the authoritative observations', () => {
 
   it('lists every image, keeping the second from hiding the first', async () => {
     const harness = await setup()
-    harness.ctx.medicalImage.observe(harness.agent, {
-      attachmentId: String(RASH.attachmentId),
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId), {
       findings: ['red patch'],
-      usable: true,
-    })
-    harness.ctx.medicalImage.observe(harness.agent, {
-      attachmentId: String(KNEE.attachmentId),
+    }))
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(KNEE.attachmentId), {
       usable: false,
       qualityIssues: ['occlusion'],
-    })
+    }))
     const result = await harness.execute()
 
     expect(result.value).toMatchObject({
@@ -160,19 +169,17 @@ describe('medical_image_get reads the authoritative observations', () => {
 
   it('reflects a later revision rather than the state at first write', async () => {
     const harness = await setup()
-    harness.ctx.medicalImage.observe(harness.agent, { attachmentId: String(RASH.attachmentId), usable: true })
-    harness.ctx.medicalImage.observe(harness.agent, {
-      attachmentId: String(RASH.attachmentId),
-      usable: true,
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId)))
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId), {
       findings: ['scaling'],
-    })
+    }))
     expect((await harness.execute({ attachmentId: String(RASH.attachmentId) })).value)
       .toMatchObject({ observations: [{ revision: 2, findings: ['scaling'] }] })
   })
 
   it('changes nothing: no event and no revision', async () => {
     const harness = await setup()
-    harness.ctx.medicalImage.observe(harness.agent, { attachmentId: String(RASH.attachmentId), usable: true })
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId)))
     const before = imageEvents(harness.agent).length
     await harness.execute()
     await harness.execute({ attachmentId: String(RASH.attachmentId) })
@@ -207,11 +214,9 @@ describe('medical_image_get respects session isolation', () => {
   it('reads only its own session', async () => {
     const harness = await setup()
     const other = await harness.ctx.agentLoop.create(SessionId('session-b'), {}, {})
-    harness.ctx.medicalImage.observe(harness.agent, {
-      attachmentId: String(RASH.attachmentId),
+    harness.ctx.medicalImage.observe(harness.agent, observation(String(RASH.attachmentId), {
       findings: ['red patch'],
-      usable: true,
-    })
+    }))
 
     expect((await harness.execute()).value).toMatchObject({ observations: [{ findings: ['red patch'] }] })
     const otherResult = await harness.ctx.tools.execute({

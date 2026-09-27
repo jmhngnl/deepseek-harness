@@ -31,16 +31,27 @@ export function normalizeObservationText(values: readonly string[]): string[] {
 }
 
 /**
- * Normalize one optional free-text field. A blank value is the same statement as
- * an omitted one — "the observer did not say" — so both become null rather than
- * an empty string the strict decoder would reject.
- * @param value - raw field as supplied by the model.
- * @returns the trimmed text, or null when absent or blank.
+ * Normalize the required, nullable body region.
+ *
+ * Three states are distinct and stay distinct: a stated region, an explicit null,
+ * and a mistake. A blank string is the mistake. Folding it into null would let a
+ * caller that meant to name a region lose it to a stray whitespace, and the
+ * strict decoder refuses an empty string precisely so that "nothing was stated"
+ * can only ever be recorded as an explicit null.
+ * @param value - the field exactly as the caller supplied it.
+ * @returns the trimmed region, or null when the caller stated null.
+ * @throws {@link MedicalImageError} when the value is a blank string.
  */
-export function optionalObservationText(value: string | undefined): string | null {
-  if (value === undefined) return null
+export function requireObservationBodyRegion(value: string | null): string | null {
+  if (value === null) return null
   const trimmed = value.trim()
-  return trimmed === '' ? null : trimmed
+  if (trimmed === '') {
+    throw new MedicalImageError(
+      'image observation bodyRegion must be a non-empty string or an explicit null',
+      'IMAGE_INVALID_BODY_REGION',
+    )
+  }
+  return trimmed
 }
 
 /**
@@ -84,16 +95,20 @@ export interface ResolvedObservationFields {
 
 /**
  * Resolve one observation request into the fields the durable value carries.
- * @param request - the model-supplied observation.
+ *
+ * Every field is present on the request, so nothing here has to guess what an
+ * omission meant: an empty list stays an empty list and never stands in for a
+ * field the caller forgot.
+ * @param request - the model-supplied full snapshot.
  * @returns the four normalized fields.
  * @throws {@link MedicalImageError} when a field cannot be represented durably.
  */
 export function resolveObservationFields(request: ImageObservationRequest): ResolvedObservationFields {
   return {
-    bodyRegion: optionalObservationText(request.bodyRegion),
-    findings: normalizeObservationText(request.findings ?? []),
-    quality: normalizeImageQuality(request.usable, request.qualityIssues ?? []),
-    uncertainty: normalizeObservationText(request.uncertainty ?? []),
+    bodyRegion: requireObservationBodyRegion(request.bodyRegion),
+    findings: normalizeObservationText(request.findings),
+    quality: normalizeImageQuality(request.usable, request.qualityIssues),
+    uncertainty: normalizeObservationText(request.uncertainty),
   }
 }
 

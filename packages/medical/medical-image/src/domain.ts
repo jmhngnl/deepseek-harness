@@ -46,15 +46,18 @@ export interface FoldedMedicalImage {
  * answer for an id this session never carried, an id belonging to another
  * session, and an id that only exists in the model's own output. Distinguishing
  * those would tell a caller which ids exist elsewhere.
+ *
+ * Every code here has a producer. A full-snapshot request carries every field, so
+ * there is no "which fields did the caller mean to keep" failure to report — the
+ * only field-level rejection left is a body region that is neither a real region
+ * nor an explicit null.
  */
 export type ImageErrorCode =
   | 'IMAGE_AGENT_NOT_LIVE'
   | 'IMAGE_ATTACHMENT_NOT_IN_SESSION'
   | 'IMAGE_OBSERVATION_NOT_FOUND'
   | 'IMAGE_STREAM_INVALID'
-  | 'IMAGE_INVALID_FINDINGS'
   | 'IMAGE_INVALID_BODY_REGION'
-  | 'IMAGE_INVALID_UNCERTAINTY'
   | 'IMAGE_INVALID_QUALITY'
 
 declare module '@deepseek-ai/dsh-session/types' {

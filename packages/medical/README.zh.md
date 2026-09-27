@@ -9,7 +9,7 @@ kind: "package-group"
 
 ## 概述
 
-medical 组承载构建在 harness 之上的医疗咨询与辅助分诊领域能力。与 harness 的能力分组不同，这些包不解决 agent 运行时的任何问题：它们处理的对象是病例而不是代码库。本组现在包含一个会话内持久病例领域 `medical-case`，以及三个面向模型的工具，用于记录该病例、增量变更它、以及只读地读回它。病例是问诊信息收集状态：领域记录、更新并回放用户说过的事实，报告仍然缺失的内容，让 agent 去提问而不是猜测。这里不包含任何诊断、用药或风险判断能力。
+medical 组承载构建在 harness 之上的医疗咨询与辅助分诊领域能力。与 harness 的能力分组不同，这些包不解决 agent 运行时的任何问题：它们处理的对象是病例而不是代码库。本组现在包含一个会话内持久病例领域 `medical-case`，以及五个面向模型的工具：三个用于记录该病例、增量变更它、以及只读地读回它，两个用于记录并读回模型在一张附加图像里观察到的东西。病例是问诊信息收集状态：领域记录、更新并回放用户说过的事实，报告仍然缺失的内容，让 agent 去提问而不是猜测。这里不包含任何诊断、用药或风险判断能力。
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ medical 组承载构建在 harness 之上的医疗咨询与辅助分诊领域能
 ## 相关文档
 
 - [医疗接诊病例子系统](../../docs/subsystems/medical-case.zh.md)——病例状态、持久事件与服务 API。
-- [生成的工具目录](../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-medical-case-intake)——模型接收的三个 schema。
+- [生成的工具目录](../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-medical-case-intake)——模型接收的五个 schema。
 - [同会话目标领域](../goal/README.zh.md)——本组遵循的同类模式：事件溯源会话内状态。
 - [工具编写参考](../../docs/cookbook/adding-a-tool.zh.md)——这些包遵循的工具约定。
 - [包分组](../README.zh.md)——本组在 harness 能力分组中的位置。

@@ -38,6 +38,12 @@ The canonical reference is never supplied by the caller. `observe` takes an atta
 
 An id the session never carried is refused, and so is an id belonging to another session: both answer `IMAGE_ATTACHMENT_NOT_IN_SESSION`, because distinguishing them would report which ids exist elsewhere. When one attachment occurs more than once, the first occurrence in derived-message order wins; that is deterministic and cannot change the stored value, because every occurrence of a content-addressed id describes the same immutable object.
 
+The reference is also immutable across an update. Only the observation may change, and the fold rejects a durable record that rewrites any field of the reference — including adding or dropping an optional `name` or `originalDimensions`. That check belongs to the fold because it is the only place that can still see both versions: once an update is applied the earlier reference is gone, and replay never consults the attachment service. A durable stream has to be decidable on its own.
+
+## Request shape
+
+An observation request is a FULL SNAPSHOT: every field is required, and `bodyRegion` is required and nullable. There is no patch shape, so a restatement that omits a finding removes it — the same thing the durable event means, since the event carries a complete observation rather than a delta. An explicit null records "no region can be stated"; a blank string is neither a region nor a null and is refused.
+
 ## Service behavior
 
 [`MedicalImageService`](../../packages/medical/medical-image/src/index.ts) accepts only the exact live `Agent` object registered under its id, reads the strict replay result from the `medicalImage` projection on `ctx.sessionProjections`, and appends complete `medical/image-observation` session events. It never reads image bytes and never calls a model: the VLM has already looked at the image, which is why the image was in its request.
@@ -90,18 +96,26 @@ require(agent: Agent, attachmentId: string): MedicalImageObservation
 /**
  * Record what the model saw in one image the session already holds.
  *
+ * The request is a FULL SNAPSHOT: every field is present, and each accepted call
+ * declares the whole current observation for that attachment. There is no
+ * "preserve the previous value" behaviour — an omitted field never reaches here,
+ * because the published schema requires it — so a restatement cannot silently
+ * drop a finding the caller forgot to repeat.
+ *
  * The canonical reference comes from the session, never from the request: the
  * request carries only the attachment id, and a media type, byte length, or
  * dimension it may also have sent is ignored. An id this session never carried
- * is refused with {@link ImageErrorCodes.IMAGE_ATTACHMENT_NOT_IN_SESSION},
- * which is also the answer for another session's attachment — naming the
- * difference would report which ids exist elsewhere.
+ * is refused with {@link ImageErrorCode.IMAGE_ATTACHMENT_NOT_IN_SESSION}, which
+ * is also the answer for another session's attachment — naming the difference
+ * would report which ids exist elsewhere.
  *
  * A restatement that records nothing new is a no-op: no event, no revision
  * change. Any other restatement of the same attachment advances it by one
- * revision, so the revision counts durable changes rather than tool calls.
+ * revision, so the revision counts durable changes rather than tool calls. The
+ * attachment itself is immutable across an update; the fold refuses a record
+ * that rewrites it.
  * @param agent - owning live agent.
- * @param request - the model-supplied observation.
+ * @param request - the model-supplied full snapshot.
  * @returns the authoritative observation and whether it changed.
  * @throws {@link MedicalImageError} when the agent is not live, the attachment is
  * not in this session, or a field cannot be represented durably.

@@ -1,5 +1,5 @@
 ---
-description: "Standalone medical-intake profile whose entire model-facing tool surface is three case tools, with no shell, filesystem, jobs, goals, subagents, workflows, or telemetry."
+description: "Standalone medical-intake profile whose entire model-facing tool surface is five medical tools, with no shell, filesystem, jobs, goals, subagents, workflows, or telemetry."
 kind: "package-bundle"
 ---
 
@@ -37,7 +37,7 @@ The Web surface is the same runtime under `dsh-web-app`:
 dsh --profile medharness-web
 ```
 
-There, an agent's tools come from its preset rather than from the host plane, so the `medical` preset in `dsh-agent-presets` is what a Web medical session sees. It mounts the same three tools.
+There, an agent's tools come from its preset rather than from the host plane, so the `medical` preset in `dsh-agent-presets` is what a Web medical session sees. It mounts the same five tools.
 
 Both profiles persist sessions through `dsh-session-persistence-jsonl` under `$DSH_HOME/sessions`, and the case lives in that same session log as `medical/case-change` events. `dsh plugin --profile medharness` manages profile-local dependencies; profile, home, and ordered `--patch` files can still replace rows.
 
@@ -71,7 +71,7 @@ Telemetry is absent rather than disabled. The `DSH_TELEMETRY_DISABLED` switch is
 
 - [Base bundle](../base/README.md) — the full product foundation this profile deliberately omits.
 - [SDK-minimal bundle](../sdk-minimal/README.md) — the other standalone bundle, and the pattern this one follows.
-- [Medical case domain](../../medical/medical-case/README.md) — the session-backed case the three tools read and write.
+- [Medical case domain](../../medical/medical-case/README.md) — the session-backed case the three case tools read and write.
 
 -----
 
@@ -82,11 +82,11 @@ Telemetry is absent rather than disabled. The `DSH_TELEMETRY_DISABLED` switch is
 
 #### What the model sees
 
-A persona stating that the agent records facts, asks for what is missing, and never diagnoses, prescribes, or assesses risk. Exactly three tool schemas: `medical_case_intake`, `medical_case_update`, and `medical_case_get`. No repository instructions, no runtime context snapshot beyond the persona's own suffix, and no tool for reading, writing, running, searching, delegating, or fetching anything.
+A persona stating that the agent records facts, asks for what is missing, and never diagnoses, prescribes, or assesses risk. Exactly five tool schemas: the three `medical_case_*` tools that record the case, change it, and read it back, and the two `medical_image_*` tools that record and read back what the model observed in an attached image. No repository instructions, no runtime context snapshot beyond the persona's own suffix, and no tool for reading, writing, running, searching, delegating, or fetching anything.
 
 #### Token effect
 
-A stable persona plus three tool schemas — measured at 4,533 bytes, about 1,133 tokens, against 29,612 bytes (about 7,403 tokens) for the same agent over `dsh-base`. Conversation history and tool results grow with the session, as everywhere else.
+A stable persona plus five tool schemas — measured at 8,384 bytes, about 2,100 tokens, against 29,612 bytes (about 7,403 tokens) for the same agent over `dsh-base`. Conversation history and tool results grow with the session, as everywhere else.
 
 #### KV Cache effect
 

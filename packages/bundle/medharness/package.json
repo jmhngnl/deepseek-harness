@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-medharness",
-  "description": "The standalone MedHarness profile bundle: the medical intake agent's minimal composition — session-backed case domain, three model-facing tools, and no coding-agent surface",
+  "description": "The standalone MedHarness profile bundle: the medical intake agent's minimal composition — session-backed case and image-observation domains, five model-facing tools, and no coding-agent surface",
   "version": "0.1.6-alpha.1",
   "publishConfig": {
     "access": "public"

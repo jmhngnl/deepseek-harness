@@ -1,12 +1,16 @@
 /**
- * Model-facing `medical_image_observe` tool: records what the model saw in one
- * image the session already holds.
+ * Model-facing `medical_image_observe` tool: records the model's complete
+ * observation of one image the session already holds.
  *
  * The model has ALREADY looked at the image — that is why the image was in its
  * request. This tool does not read the image, does not call a model, and does not
  * re-derive anything from the bytes. It takes the model's structured account of
  * what is directly visible, hands it to the domain service, and returns the
  * authoritative observation.
+ *
+ * The request is a FULL SNAPSHOT: every field is required, so one call declares
+ * the whole current observation. Nothing here preserves an older value, because
+ * the durable event is a full state too — see the package README.
  *
  * @module @deepseek-ai/dsh-tool-medical-image-observe
  */
@@ -24,18 +28,18 @@ export const name = 'tool-medical-image-observe'
 /** Services required by the medical image observation tool. */
 export const inject = ['agents', 'medicalImage', 'tools']
 
-const description = 'Record what you can DIRECTLY SEE in an image the user attached to this conversation. '
-  + 'Use it once per image, after you have looked at the image. '
-  + 'Pass the attachmentId shown beside the image in the conversation; the harness resolves it against this session and '
-  + 'rejects an id that was not attached here. '
-  + 'Record only visible properties: body region, colour, shape, size, distribution, surface appearance, swelling, '
-  + 'discoloration, or anything else you can point at in the picture. '
-  + 'State image limitations (blur, poor lighting, occlusion, too distant, unable to assess) and what you could not '
-  + 'determine. If the image cannot be assessed reliably, set usable to false and say why rather than guessing. '
-  + 'Do NOT state a diagnosis, name a disease or condition, suggest treatment or medication, or give a risk, urgency, or '
-  + 'triage judgement: this tool records visible evidence, not a clinical conclusion. '
-  + 'Do NOT restate these findings as patient-reported symptoms; the case record is updated only from what the user says. '
-  + 'Repeating the same observation is a no-op and does not create a new revision.'
+const description = 'Record the COMPLETE current observation of one image the user attached to this conversation, '
+  + 'after you have looked at it. Every field is required: this is a full snapshot, not a patch, so never omit a field '
+  + 'intending to preserve an older value. '
+  + 'Pass the attachmentId shown beside the image; the harness resolves it against this session and rejects an id that '
+  + 'was not attached here. '
+  + 'Record only what is DIRECTLY VISIBLE: body region, colour, shape, size, distribution, surface appearance, '
+  + 'swelling, discoloration. State image limitations and what you could not determine; if the image cannot be '
+  + 'assessed reliably, set usable to false and say why instead of guessing. '
+  + 'Do NOT state a diagnosis, name a disease or condition, suggest treatment or medication, or give a risk, urgency, '
+  + 'or triage judgement. '
+  + 'Do NOT restate these findings as patient-reported symptoms: the case record changes only from what the user says. '
+  + 'Repeating an identical snapshot is a no-op and does not create a new revision.'
 
 /** The value shape the output schema projects, as the renderer receives it. */
 interface RenderedObservation {
@@ -78,16 +82,26 @@ export function apply(ctx: Context): void {
           + 'this session is rejected, and the harness uses its own record of the image rather than any detail you send.',
       },
       bodyRegion: {
-        type: 'string',
-        description: 'The body region the image shows, as you would describe it (for example "left forearm"). '
-          + 'Omit when you cannot tell.',
+        required: true,
+        // Required AND nullable: "no region can be stated" is a fact worth
+        // recording, and it is not the same as having left the field out. The
+        // schema therefore admits an explicit null, and the domain refuses a
+        // blank string rather than folding it into null.
+        oneOf: [
+          {
+            type: 'string',
+            description: 'The body region the image shows, as you would describe it (for example "left forearm").',
+          },
+          { type: 'null', description: 'Pass null when no body region can be stated from this image.' },
+        ],
       },
       findings: {
         type: 'array',
+        required: true,
         items: { type: 'string' },
-        description: 'Directly visible findings, one short phrase each (for example "irregular red patch", '
-          + '"raised border", "dry flaking surface"). Pass an empty array or omit when nothing can be described. '
-          + 'Do not include a diagnosis, a disease name, or a severity judgement.',
+        description: 'Every directly visible finding, one short phrase each (for example "irregular red patch", '
+          + '"raised border"). Pass an empty array when nothing can be described. Do not include a diagnosis, a disease '
+          + 'name, or a severity judgement.',
       },
       usable: {
         type: 'boolean',
@@ -97,14 +111,16 @@ export function apply(ctx: Context): void {
       },
       qualityIssues: {
         type: 'array',
+        required: true,
         items: { type: 'string', enum: ['blur', 'poor_lighting', 'occlusion', 'too_distant', 'unable_to_assess'] },
-        description: 'Image limitations you observed. Omit when the image has none.',
+        description: 'Every image limitation you observed. Pass an empty array when the image has none.',
       },
       uncertainty: {
         type: 'array',
+        required: true,
         items: { type: 'string' },
-        description: 'What you could not determine from this image (for example "depth cannot be judged from a single '
-          + 'view"). Omit when there is nothing you are unsure about.',
+        description: 'Everything you could not determine from this image (for example "depth cannot be judged from a '
+          + 'single view"). Pass an empty array when there is nothing you are unsure about.',
       },
     },
     output: {
@@ -134,11 +150,11 @@ export function apply(ctx: Context): void {
       }
       const result = ctx.medicalImage.observe(agent, {
         attachmentId: args.attachmentId,
-        ...args.bodyRegion === undefined ? {} : { bodyRegion: args.bodyRegion },
-        ...args.findings === undefined ? {} : { findings: args.findings },
+        bodyRegion: args.bodyRegion,
+        findings: args.findings,
         usable: args.usable,
-        ...args.qualityIssues === undefined ? {} : { qualityIssues: args.qualityIssues },
-        ...args.uncertainty === undefined ? {} : { uncertainty: args.uncertainty },
+        qualityIssues: args.qualityIssues,
+        uncertainty: args.uncertainty,
       })
       return Promise.resolve({
         attachmentId: String(result.view.attachment.attachmentId),

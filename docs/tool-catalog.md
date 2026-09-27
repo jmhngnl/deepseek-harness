@@ -1752,7 +1752,7 @@ Reads the session’s authoritative case record and the required fields still mi
 
 ### `medical_image_observe`
 
-Record what you can DIRECTLY SEE in an image the user attached to this conversation. Use it once per image, after you have looked at the image. Pass the attachmentId shown beside the image in the conversation; the harness resolves it against this session and rejects an id that was not attached here. Record only visible properties: body region, colour, shape, size, distribution, surface appearance, swelling, discoloration, or anything else you can point at in the picture. State image limitations (blur, poor lighting, occlusion, too distant, unable to assess) and what you could not determine. If the image cannot be assessed reliably, set usable to false and say why rather than guessing. Do NOT state a diagnosis, name a disease or condition, suggest treatment or medication, or give a risk, urgency, or triage judgement: this tool records visible evidence, not a clinical conclusion. Do NOT restate these findings as patient-reported symptoms; the case record is updated only from what the user says. Repeating the same observation is a no-op and does not create a new revision.
+Record the COMPLETE current observation of one image the user attached to this conversation, after you have looked at it. Every field is required: this is a full snapshot, not a patch, so never omit a field intending to preserve an older value. Pass the attachmentId shown beside the image; the harness resolves it against this session and rejects an id that was not attached here. Record only what is DIRECTLY VISIBLE: body region, colour, shape, size, distribution, surface appearance, swelling, discoloration. State image limitations and what you could not determine; if the image cannot be assessed reliably, set usable to false and say why instead of guessing. Do NOT state a diagnosis, name a disease or condition, suggest treatment or medication, or give a risk, urgency, or triage judgement. Do NOT restate these findings as patient-reported symptoms: the case record changes only from what the user says. Repeating an identical snapshot is a no-op and does not create a new revision.
 
 ```json
 {
@@ -1763,12 +1763,20 @@ Record what you can DIRECTLY SEE in an image the user attached to this conversat
       "description": "The attachment id shown beside the image in this conversation. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
     },
     "bodyRegion": {
-      "type": "string",
-      "description": "The body region the image shows, as you would describe it (for example \"left forearm\"). Omit when you cannot tell."
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "The body region the image shows, as you would describe it (for example \"left forearm\")."
+        },
+        {
+          "type": "null",
+          "description": "Pass null when no body region can be stated from this image."
+        }
+      ]
     },
     "findings": {
       "type": "array",
-      "description": "Directly visible findings, one short phrase each (for example \"irregular red patch\", \"raised border\", \"dry flaking surface\"). Pass an empty array or omit when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
+      "description": "Every directly visible finding, one short phrase each (for example \"irregular red patch\", \"raised border\"). Pass an empty array when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
       "items": {
         "type": "string"
       }
@@ -1779,7 +1787,7 @@ Record what you can DIRECTLY SEE in an image the user attached to this conversat
     },
     "qualityIssues": {
       "type": "array",
-      "description": "Image limitations you observed. Omit when the image has none.",
+      "description": "Every image limitation you observed. Pass an empty array when the image has none.",
       "items": {
         "type": "string",
         "enum": [
@@ -1793,7 +1801,7 @@ Record what you can DIRECTLY SEE in an image the user attached to this conversat
     },
     "uncertainty": {
       "type": "array",
-      "description": "What you could not determine from this image (for example \"depth cannot be judged from a single view\"). Omit when there is nothing you are unsure about.",
+      "description": "Everything you could not determine from this image (for example \"depth cannot be judged from a single view\"). Pass an empty array when there is nothing you are unsure about.",
       "items": {
         "type": "string"
       }
@@ -1801,7 +1809,11 @@ Record what you can DIRECTLY SEE in an image the user attached to this conversat
   },
   "required": [
     "attachmentId",
-    "usable"
+    "bodyRegion",
+    "findings",
+    "usable",
+    "qualityIssues",
+    "uncertainty"
   ]
 }
 ```

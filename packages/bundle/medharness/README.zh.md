@@ -1,5 +1,5 @@
 ---
-description: "独立的医疗接诊 profile：模型可见的工具面只有三个病例工具，不含 shell、文件系统、后台任务、目标、子代理、工作流与遥测。"
+description: "独立的医疗接诊 profile：模型可见的工具面只有五个医疗工具，不含 shell、文件系统、后台任务、目标、子代理、工作流与遥测。"
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-当 Agent 的职责只是「记录用户陈述的病例事实并追问缺失项」时，使用 `dsh --profile medharness`。该 profile 提供一个完整的 Cordis 树，并刻意排除 `dsh-base`：没有 shell、没有文件系统、没有后台任务、没有目标、没有待办、没有计划模式、没有子代理、没有工作流、没有技能、没有联网搜索、没有遥测。模型看到的是 `medical_case_intake`、`medical_case_update`、`medical_case_get` 三个工具，背后是一个把病例存进会话日志的领域包。它记录并报告缺口，不做诊断、不开处方、不做风险评估。
+当 Agent 的职责只是「记录用户陈述的病例事实并追问缺失项」时，使用 `dsh --profile medharness`。该 profile 提供一个完整的 Cordis 树，并刻意排除 `dsh-base`：没有 shell、没有文件系统、没有后台任务、没有目标、没有待办、没有计划模式、没有子代理、没有工作流、没有技能、没有联网搜索、没有遥测。模型看到的是 `medical_case_intake`、`medical_case_update`、`medical_case_get`、`medical_image_observe`、`medical_image_get` 五个工具，背后是两个把病例与图像观察都存进会话日志的领域包。它记录并报告缺口，不做诊断、不开处方、不做风险评估。
 
 ## 目录
 
@@ -37,7 +37,7 @@ Web 界面是同一套运行时叠在 `dsh-web-app` 之上：
 dsh --profile medharness-web
 ```
 
-那里 Agent 的工具来自它的 preset 而不是宿主机平面，所以 Web 医疗会话看到的是 `dsh-agent-presets` 里的 `medical` preset —— 它挂载同样这三个工具。
+那里 Agent 的工具来自它的 preset 而不是宿主机平面，所以 Web 医疗会话看到的是 `dsh-agent-presets` 里的 `medical` preset —— 它挂载同样这五个工具。
 
 两个 profile 都通过 `dsh-session-persistence-jsonl` 把会话持久化到 `$DSH_HOME/sessions` 下，病例就以 `medical/case-change` 事件的形式存在于同一份会话日志里。`dsh plugin --profile medharness` 可管理 profile 本地依赖；profile、home 与有序的 `--patch` 文件仍可覆盖行。
 
@@ -71,7 +71,7 @@ dsh --profile medharness-web
 
 - [base bundle](../base/README.zh.md) —— 本 profile 刻意省略的完整产品基础。
 - [sdk-minimal bundle](../sdk-minimal/README.zh.md) —— 另一个独立 bundle，也是本包效仿的范式。
-- [医疗病例领域](../../medical/medical-case/README.zh.md) —— 三个工具读写的那份会话内病例。
+- [医疗病例领域](../../medical/medical-case/README.zh.md) —— 三个病例工具读写的那份会话内病例。
 
 -----
 
@@ -82,11 +82,11 @@ dsh --profile medharness-web
 
 #### 模型看到什么
 
-一段人设，说明该 Agent 记录事实、追问缺失项，且从不诊断、开处方或评估风险。恰有三个工具 schema：`medical_case_intake`、`medical_case_update`、`medical_case_get`。没有仓库指令文件，除人设自带的尾注外没有运行时上下文快照，也没有任何用于读取、写入、执行、搜索、委派或联网的工具。
+一段人设，说明该 Agent 记录事实、追问缺失项，且从不诊断、开处方或评估风险。恰有五个工具 schema：三个 `medical_case_*` 工具负责记录病例、增量变更它、只读读回它，两个 `medical_image_*` 工具负责记录并读回模型在一张附加图像里观察到的东西。没有仓库指令文件，除人设自带的尾注外没有运行时上下文快照，也没有任何用于读取、写入、执行、搜索、委派或联网的工具。
 
 #### Token 影响
 
-一段稳定的人设加三个工具 schema —— 实测 4,533 字节，约 1,133 tokens；同一 Agent 跑在 `dsh-base` 之上时为 29,612 字节、约 7,403 tokens。会话历史与工具结果随会话增长，与其他 profile 一致。
+一段稳定的人设加五个工具 schema —— 实测 8,384 字节，约 2,100 tokens；同一 Agent 跑在 `dsh-base` 之上时为 29,612 字节、约 7,403 tokens。会话历史与工具结果随会话增长，与其他 profile 一致。
 
 #### KV Cache 影响
 

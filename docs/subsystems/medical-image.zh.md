@@ -38,6 +38,12 @@ canonical 引用从不来自调用方。`observe` 接受一个 attachment id，�
 
 本会话从未携带过的 id 会被拒绝，属于另一个会话的 id 同样被拒绝：两者都回答 `IMAGE_ATTACHMENT_NOT_IN_SESSION`，因为区分它们等于报告别处存在哪些 id。同一附件出现多次时，按派生消息顺序取第一次出现；这既是确定性的，也不会改变被存储的值，因为内容寻址的同一个 id 的每一次出现描述的都是同一个不可变对象。
 
+引用在 update 之间同样不可变。只有观察可以变，而 fold 会拒绝任何重写引用中任一字段的持久记录——包括增删可选的 `name` 或 `originalDimensions`。这条检查归 fold 所有，因为它是唯一还能同时看到两个版本的地方：update 一旦应用，较早的那份引用就从 projection 里消失了，而重放从不访问附件服务。持久流必须能独立判定。
+
+## 请求形态
+
+观察请求是一份**完整快照**：每个字段都必填，且 `bodyRegion` 必填但可为 null。这里没有 patch 形态，所以一次省略了某条发现的新陈述会把它移除——这与持久事件的含义一致，因为事件携带的是完整观察而不是增量。显式 null 记录「无法陈述任何部位」；空白字符串既不是部位也不是 null，会被拒绝。
+
 ## 服务行为
 
 [`MedicalImageService`](../../packages/medical/medical-image/src/index.ts) 只接受在其 id 下注册的那个确切的存活 `Agent` 对象，从 `ctx.sessionProjections` 上的 `medicalImage` projection 读取严格重放结果，并追加完整的 `medical/image-observation` 会话事件。它从不读取图像字节，也从不调用模型：VLM 已经看过那张图了，这正是图片出现在它请求里的原因。
@@ -90,18 +96,26 @@ require(agent: Agent, attachmentId: string): MedicalImageObservation
 /**
  * Record what the model saw in one image the session already holds.
  *
+ * The request is a FULL SNAPSHOT: every field is present, and each accepted call
+ * declares the whole current observation for that attachment. There is no
+ * "preserve the previous value" behaviour — an omitted field never reaches here,
+ * because the published schema requires it — so a restatement cannot silently
+ * drop a finding the caller forgot to repeat.
+ *
  * The canonical reference comes from the session, never from the request: the
  * request carries only the attachment id, and a media type, byte length, or
  * dimension it may also have sent is ignored. An id this session never carried
- * is refused with {@link ImageErrorCodes.IMAGE_ATTACHMENT_NOT_IN_SESSION},
- * which is also the answer for another session's attachment — naming the
- * difference would report which ids exist elsewhere.
+ * is refused with {@link ImageErrorCode.IMAGE_ATTACHMENT_NOT_IN_SESSION}, which
+ * is also the answer for another session's attachment — naming the difference
+ * would report which ids exist elsewhere.
  *
  * A restatement that records nothing new is a no-op: no event, no revision
  * change. Any other restatement of the same attachment advances it by one
- * revision, so the revision counts durable changes rather than tool calls.
+ * revision, so the revision counts durable changes rather than tool calls. The
+ * attachment itself is immutable across an update; the fold refuses a record
+ * that rewrites it.
  * @param agent - owning live agent.
- * @param request - the model-supplied observation.
+ * @param request - the model-supplied full snapshot.
  * @returns the authoritative observation and whether it changed.
  * @throws {@link MedicalImageError} when the agent is not live, the attachment is
  * not in this session, or a field cannot be represented durably.

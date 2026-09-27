@@ -1769,12 +1769,20 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
       "description": "The attachment id shown beside the image in this conversation. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
     },
     "bodyRegion": {
-      "type": "string",
-      "description": "The body region the image shows, as you would describe it (for example \"left forearm\"). Omit when you cannot tell."
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "The body region the image shows, as you would describe it (for example \"left forearm\")."
+        },
+        {
+          "type": "null",
+          "description": "Pass null when no body region can be stated from this image."
+        }
+      ]
     },
     "findings": {
       "type": "array",
-      "description": "Directly visible findings, one short phrase each (for example \"irregular red patch\", \"raised border\", \"dry flaking surface\"). Pass an empty array or omit when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
+      "description": "Every directly visible finding, one short phrase each (for example \"irregular red patch\", \"raised border\"). Pass an empty array when nothing can be described. Do not include a diagnosis, a disease name, or a severity judgement.",
       "items": {
         "type": "string"
       }
@@ -1785,7 +1793,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "qualityIssues": {
       "type": "array",
-      "description": "Image limitations you observed. Omit when the image has none.",
+      "description": "Every image limitation you observed. Pass an empty array when the image has none.",
       "items": {
         "type": "string",
         "enum": [
@@ -1799,7 +1807,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "uncertainty": {
       "type": "array",
-      "description": "What you could not determine from this image (for example \"depth cannot be judged from a single view\"). Omit when there is nothing you are unsure about.",
+      "description": "Everything you could not determine from this image (for example \"depth cannot be judged from a single view\"). Pass an empty array when there is nothing you are unsure about.",
       "items": {
         "type": "string"
       }
@@ -1807,7 +1815,11 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
   },
   "required": [
     "attachmentId",
-    "usable"
+    "bodyRegion",
+    "findings",
+    "usable",
+    "qualityIssues",
+    "uncertainty"
   ]
 }
 ```

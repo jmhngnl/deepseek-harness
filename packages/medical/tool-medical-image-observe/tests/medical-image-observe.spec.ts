@@ -1,7 +1,7 @@
 /**
- * Unit coverage for `medical_image_observe`: the schema it publishes, the full
- * path from a tool call through the service, the session event, and the
- * projection back to the tool result, and the refusals it must surface.
+ * Unit coverage for `medical_image_observe`: the full-snapshot schema it
+ * publishes, the path from a tool call through the service, the session event,
+ * and the projection back to the tool result, and the refusals it must surface.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -28,6 +28,22 @@ const RASH: ImageAttachmentRef = {
   width: 640,
   height: 480,
   name: 'rash.png',
+}
+
+/**
+ * One COMPLETE tool-call argument set. The published schema requires every field,
+ * so a test that omits one on purpose does so explicitly.
+ */
+function snapshot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    attachmentId: String(RASH.attachmentId),
+    bodyRegion: null,
+    findings: [],
+    usable: true,
+    qualityIssues: [],
+    uncertainty: [],
+    ...overrides,
+  }
 }
 
 interface Harness {
@@ -71,10 +87,14 @@ describe('medical_image_observe registration and schema', () => {
     const schema = ctx.tools.schemas().find(tool => tool.name === 'medical_image_observe')
     expect(schema).toMatchObject({ name: 'medical_image_observe' })
     const description = schema?.description ?? ''
-    expect(description).toContain('DIRECTLY SEE')
+    expect(description).toContain('DIRECTLY VISIBLE')
     expect(description).toContain('Do NOT state a diagnosis')
     expect(description).toContain('Do NOT restate these findings as patient-reported symptoms')
     expect(description).toContain('usable to false')
+    // The full-snapshot contract is stated where the model reads it.
+    expect(description).toContain('COMPLETE current observation')
+    expect(description).toContain('full snapshot, not a patch')
+    expect(description).toContain('never omit a field')
     // No parameter NAMES a clinical conclusion. The words appear in the
     // descriptions only inside prohibitions, which is the point of the tool.
     const parameters = (schema?.parameters ?? {}) as { properties?: Record<string, unknown> }
@@ -85,11 +105,24 @@ describe('medical_image_observe registration and schema', () => {
     }
   })
 
-  it('requires the attachment id and the usability verdict', async () => {
+  it('requires EVERY field of the snapshot', async () => {
     const { ctx } = await setup()
     const schema = ctx.tools.schemas().find(tool => tool.name === 'medical_image_observe')
     const required = (schema?.parameters as { required?: readonly string[] } | undefined)?.required ?? []
-    expect([...required].sort()).toEqual(['attachmentId', 'usable'])
+    expect([...required].sort()).toEqual([
+      'attachmentId', 'bodyRegion', 'findings', 'qualityIssues', 'uncertainty', 'usable',
+    ])
+  })
+
+  it('admits an explicit null body region but not an optional one', async () => {
+    const { ctx } = await setup()
+    const schema = ctx.tools.schemas().find(tool => tool.name === 'medical_image_observe')
+    const properties = (schema?.parameters as {
+      properties?: Record<string, { oneOf?: readonly { type?: string }[] }>
+    }).properties ?? {}
+    // Required AND nullable: the union is published, and the field is in the
+    // required list asserted above, so "no region" is stated rather than omitted.
+    expect(properties.bodyRegion?.oneOf?.map(branch => branch.type)).toEqual(['string', 'null'])
   })
 
   it('unregisters with its plugin fiber', async () => {
@@ -104,17 +137,15 @@ describe('medical_image_observe registration and schema', () => {
   })
 })
 
-describe('medical_image_observe records what the model saw', () => {
+describe('medical_image_observe records one complete snapshot', () => {
   it('writes one event, returns the authoritative observation, and renders it', async () => {
     const harness = await setup()
-    const result = await harness.execute({
-      attachmentId: String(RASH.attachmentId),
+    const result = await harness.execute(snapshot({
       bodyRegion: 'left forearm',
       findings: ['irregular red patch', 'raised border'],
-      usable: true,
       qualityIssues: ['blur'],
       uncertainty: ['depth cannot be judged from one view'],
-    })
+    }))
 
     expect(result.isError).toBe(false)
     expect(result.value).toMatchObject({
@@ -133,9 +164,16 @@ describe('medical_image_observe records what the model saw', () => {
     expect(imageEvents(harness.agent)).toHaveLength(1)
   })
 
-  it('is a no-op when the same observation is submitted twice', async () => {
+  it('accepts an explicit null body region', async () => {
     const harness = await setup()
-    const arguments_ = { attachmentId: String(RASH.attachmentId), findings: ['red patch'], usable: true }
+    const result = await harness.execute(snapshot({ bodyRegion: null, findings: ['red patch'] }))
+    expect(result.isError).toBe(false)
+    expect(result.value).toMatchObject({ bodyRegion: null })
+  })
+
+  it('is a no-op when the identical snapshot is submitted twice', async () => {
+    const harness = await setup()
+    const arguments_ = snapshot({ bodyRegion: 'left forearm', findings: ['red patch'] })
     await harness.execute(arguments_)
     const second = await harness.execute(arguments_)
 
@@ -143,41 +181,63 @@ describe('medical_image_observe records what the model saw', () => {
     expect(imageEvents(harness.agent)).toHaveLength(1)
   })
 
-  it('advances the revision when a recorded field changes', async () => {
+  it('advances the revision when the snapshot records something different', async () => {
     const harness = await setup()
-    await harness.execute({ attachmentId: String(RASH.attachmentId), findings: ['red patch'], usable: true })
-    const second = await harness.execute({
-      attachmentId: String(RASH.attachmentId),
-      findings: ['red patch', 'scaling'],
-      usable: true,
-    })
+    await harness.execute(snapshot({ findings: ['red patch'] }))
+    const second = await harness.execute(snapshot({ findings: ['red patch', 'scaling'] }))
 
     expect(second.value).toMatchObject({ revision: 2, changed: true })
     expect(imageEvents(harness.agent)).toHaveLength(2)
   })
 
+  it('replaces the whole observation, so a dropped finding is really dropped', async () => {
+    // This is the behaviour the full-snapshot contract exists to make explicit:
+    // there is no "keep the previous value" path for a field the caller omits.
+    const harness = await setup()
+    await harness.execute(snapshot({ bodyRegion: 'left forearm', findings: ['red patch', 'scaling'] }))
+    const second = await harness.execute(snapshot({ bodyRegion: 'left forearm', findings: ['red patch'] }))
+
+    expect(second.value).toMatchObject({ revision: 2, findings: ['red patch'] })
+  })
+
   it('records an unusable image with the reason and no findings', async () => {
     const harness = await setup()
-    const result = await harness.execute({
-      attachmentId: String(RASH.attachmentId),
-      usable: false,
-      qualityIssues: ['blur', 'too_distant'],
-    })
+    const result = await harness.execute(snapshot({ usable: false, qualityIssues: ['blur', 'too_distant'] }))
 
     expect(result.value).toMatchObject({ usable: false, findings: [], qualityIssues: ['blur', 'too_distant'] })
   })
 
   it('reads the record back through the projection, not from the tool result', async () => {
     const harness = await setup()
-    await harness.execute({ attachmentId: String(RASH.attachmentId), bodyRegion: 'left forearm', usable: true })
+    await harness.execute(snapshot({ bodyRegion: 'left forearm' }))
     expect(harness.ctx.medicalImage.require(harness.agent, String(RASH.attachmentId)).bodyRegion).toBe('left forearm')
   })
 })
 
 describe('medical_image_observe refusals', () => {
+  it('refuses a call that omits any required snapshot field', async () => {
+    const harness = await setup()
+    for (const omitted of ['attachmentId', 'bodyRegion', 'findings', 'usable', 'qualityIssues', 'uncertainty']) {
+      const arguments_ = Object.fromEntries(
+        Object.entries(snapshot()).filter(([key]) => key !== omitted),
+      )
+      const result = await harness.execute(arguments_)
+      expect(result.isError, `omitting ${omitted} must be refused`).toBe(true)
+    }
+    expect(imageEvents(harness.agent)).toEqual([])
+  })
+
+  it('refuses a blank body region rather than treating it as null', async () => {
+    const harness = await setup()
+    const result = await harness.execute(snapshot({ bodyRegion: '   ' }))
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('bodyRegion must be a non-empty string or an explicit null')
+    expect(imageEvents(harness.agent)).toEqual([])
+  })
+
   it('refuses an attachment id this session never carried', async () => {
     const harness = await setup()
-    const result = await harness.execute({ attachmentId: 'sha256:made-up', usable: true })
+    const result = await harness.execute(snapshot({ attachmentId: 'sha256:made-up' }))
 
     expect(result.isError).toBe(true)
     expect(JSON.stringify(result.content)).toContain('no user image with attachment')
@@ -191,7 +251,7 @@ describe('medical_image_observe refusals', () => {
       signal,
       callId: ToolCallId('medical-image-observe-other-session'),
       name: 'medical_image_observe',
-      arguments: { attachmentId: String(RASH.attachmentId), usable: true },
+      arguments: snapshot(),
       agent: other,
     })
 
@@ -201,11 +261,7 @@ describe('medical_image_observe refusals', () => {
 
   it('refuses a quality issue the schema does not admit', async () => {
     const harness = await setup()
-    const result = await harness.execute({
-      attachmentId: String(RASH.attachmentId),
-      usable: true,
-      qualityIssues: ['looks_infected'],
-    })
+    const result = await harness.execute(snapshot({ qualityIssues: ['looks_infected'] }))
 
     // The published schema is the first gate; the domain validates the same
     // union again on its own, so a caller that bypasses the tool cannot slip a
@@ -221,7 +277,7 @@ describe('medical_image_observe refusals', () => {
       signal,
       callId: ToolCallId('medical-image-observe-no-agent'),
       name: 'medical_image_observe',
-      arguments: { attachmentId: String(RASH.attachmentId), usable: true },
+      arguments: snapshot(),
     })
 
     expect(result.isError).toBe(true)

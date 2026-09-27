@@ -217,7 +217,7 @@ describe('the surface guard', () => {
     expect(() => { assertMedicalSurface([...LIVE_MEDICAL_TOOLS].reverse()) }).not.toThrow()
   })
 
-  it('rejects a composition that published a fourth tool', () => {
+  it('rejects a composition that published an extra tool', () => {
     expect(() => { assertMedicalSurface([...LIVE_MEDICAL_TOOLS, 'bash']) })
       .toThrow(/must publish exactly/)
   })

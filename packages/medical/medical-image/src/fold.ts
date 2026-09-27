@@ -186,6 +186,12 @@ function applyUpdate(state: MedicalImageFoldState, next: MedicalImageObservation
   if (current === undefined) {
     throw new Error(`medical image update requires an existing observation for ${JSON.stringify(key)}`)
   }
+  // Checked before revision, so a record that rewrote the image is reported as a
+  // rewritten image rather than as a revision mistake. The attachment is
+  // immutable: only the observation may change across an update.
+  if (!sameAttachmentRef(current.attachment, next.attachment)) {
+    throw new Error('medical image update cannot change the canonical attachment reference')
+  }
   if (next.revision !== current.revision + 1) {
     throw new Error('medical image update must advance the observation by one revision')
   }
@@ -208,6 +214,43 @@ function sameObservationFields(current: MedicalImageObservation, next: MedicalIm
     && current.quality.usable === next.quality.usable
     && current.quality.issues.length === next.quality.issues.length
     && current.quality.issues.every((issue, index) => issue === next.quality.issues[index])
+}
+
+/** Whether two optional pre-normalization dimension pairs are the same, treating absent as a value. */
+function sameOriginalDimensions(
+  current: ImageAttachmentRef['originalDimensions'],
+  next: ImageAttachmentRef['originalDimensions'],
+): boolean {
+  if (current === undefined || next === undefined) return current === next
+  return current.width === next.width && current.height === next.height
+}
+
+/**
+ * Whether two references describe the same immutable image object.
+ *
+ * `attachmentId` is content-addressed: one id can only ever describe one object,
+ * so a durable record that keeps the id and changes any other field is corrupt
+ * rather than a new image. The comparison is TOTAL — every field the reference
+ * carries is compared, and an absent optional field matches only an absent one —
+ * so a rewrite that silently adds or drops a `name` or an `originalDimensions` is
+ * refused too, not just one that changes a number.
+ *
+ * The fold owns this rule because it is the only place that can still see both
+ * versions of the reference. Once an update is applied, the earlier reference is
+ * gone from the projection, and the attachment service is never consulted during
+ * replay: a durable stream must be decidable on its own.
+ * @param current - the reference the projection already holds for this attachment.
+ * @param next - the reference carried by the incoming change.
+ * @returns whether every field of the reference is identical.
+ */
+export function sameAttachmentRef(current: ImageAttachmentRef, next: ImageAttachmentRef): boolean {
+  return current.attachmentId === next.attachmentId
+    && current.mediaType === next.mediaType
+    && current.bytes === next.bytes
+    && current.width === next.width
+    && current.height === next.height
+    && current.name === next.name
+    && sameOriginalDimensions(current.originalDimensions, next.originalDimensions)
 }
 
 /**

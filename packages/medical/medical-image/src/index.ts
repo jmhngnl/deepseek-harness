@@ -60,13 +60,14 @@ export {
   emptyMedicalImageFoldState,
   foldMedicalImage,
   imageReplayError,
+  sameAttachmentRef,
 } from './fold.ts'
 export type { MedicalImageFoldState } from './fold.ts'
 export {
   normalizeImageQuality,
   normalizeObservationText,
-  optionalObservationText,
   recordsSameObservation,
+  requireObservationBodyRegion,
   resolveObservationFields,
 } from './observation.ts'
 export type { ResolvedObservationFields } from './observation.ts'
@@ -279,18 +280,26 @@ export class MedicalImageService extends Service {
   /**
    * Record what the model saw in one image the session already holds.
    *
+   * The request is a FULL SNAPSHOT: every field is present, and each accepted call
+   * declares the whole current observation for that attachment. There is no
+   * "preserve the previous value" behaviour — an omitted field never reaches here,
+   * because the published schema requires it — so a restatement cannot silently
+   * drop a finding the caller forgot to repeat.
+   *
    * The canonical reference comes from the session, never from the request: the
    * request carries only the attachment id, and a media type, byte length, or
    * dimension it may also have sent is ignored. An id this session never carried
-   * is refused with {@link ImageErrorCodes.IMAGE_ATTACHMENT_NOT_IN_SESSION},
-   * which is also the answer for another session's attachment — naming the
-   * difference would report which ids exist elsewhere.
+   * is refused with {@link ImageErrorCode.IMAGE_ATTACHMENT_NOT_IN_SESSION}, which
+   * is also the answer for another session's attachment — naming the difference
+   * would report which ids exist elsewhere.
    *
    * A restatement that records nothing new is a no-op: no event, no revision
    * change. Any other restatement of the same attachment advances it by one
-   * revision, so the revision counts durable changes rather than tool calls.
+   * revision, so the revision counts durable changes rather than tool calls. The
+   * attachment itself is immutable across an update; the fold refuses a record
+   * that rewrites it.
    * @param agent - owning live agent.
-   * @param request - the model-supplied observation.
+   * @param request - the model-supplied full snapshot.
    * @returns the authoritative observation and whether it changed.
    * @throws {@link MedicalImageError} when the agent is not live, the attachment is
    * not in this session, or a field cannot be represented durably.

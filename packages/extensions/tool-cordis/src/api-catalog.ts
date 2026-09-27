@@ -1378,8 +1378,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'observe(agent: Agent, request: ImageObservationRequest): ImageObservationResult',
-        description: 'Record what the model saw in one image the session already holds.\n\nThe canonical reference comes from the session, never from the request: the request carries only the attachment id, and a media type, byte length, or dimension it may also have sent is ignored. An id this session never carried is refused with ImageErrorCodes.IMAGE_ATTACHMENT_NOT_IN_SESSION, which is also the answer for another session\'s attachment — naming the difference would report which ids exist elsewhere.\n\nA restatement that records nothing new is a no-op: no event, no revision change. Any other restatement of the same attachment advances it by one revision, so the revision counts durable changes rather than tool calls.',
-        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'the model-supplied observation.' }],
+        description: 'Record what the model saw in one image the session already holds.\n\nThe request is a FULL SNAPSHOT: every field is present, and each accepted call declares the whole current observation for that attachment. There is no "preserve the previous value" behaviour — an omitted field never reaches here, because the published schema requires it — so a restatement cannot silently drop a finding the caller forgot to repeat.\n\nThe canonical reference comes from the session, never from the request: the request carries only the attachment id, and a media type, byte length, or dimension it may also have sent is ignored. An id this session never carried is refused with ImageErrorCode.IMAGE_ATTACHMENT_NOT_IN_SESSION, which is also the answer for another session\'s attachment — naming the difference would report which ids exist elsewhere.\n\nA restatement that records nothing new is a no-op: no event, no revision change. Any other restatement of the same attachment advances it by one revision, so the revision counts durable changes rather than tool calls. The attachment itself is immutable across an update; the fold refuses a record that rewrites it.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'the model-supplied full snapshot.' }],
         returns: 'the authoritative observation and whether it changed.',
         throws: ['{@link MedicalImageError} when the agent is not live, the attachment is not in this session, or a field cannot be represented durably.'],
       },
@@ -4600,7 +4600,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ImageObservationRequest',
-    declaration: 'export interface ImageObservationRequest {\n    readonly attachmentId: string;\n    readonly bodyRegion?: string;\n    readonly findings?: string[];\n    readonly usable: boolean;\n    readonly qualityIssues?: ImageQualityIssue[];\n    readonly uncertainty?: string[];\n}',
+    declaration: 'export interface ImageObservationRequest {\n    readonly attachmentId: string;\n    readonly bodyRegion: string | null;\n    readonly findings: string[];\n    readonly usable: boolean;\n    readonly qualityIssues: ImageQualityIssue[];\n    readonly uncertainty: string[];\n}',
   },
   {
     name: 'ImageObservationResult',

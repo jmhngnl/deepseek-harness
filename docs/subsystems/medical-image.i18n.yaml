@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/medical-image.md
-medical-image.md: 480a532be29848f8d524e7ae16789cb991873fa2
-medical-image.zh.md: 6a79fa8e9b0f80d902950b88b8d88174a0e82375
+medical-image.md: 4f6b388e2170718d5e3faba30b8a10476cfac66b
+medical-image.zh.md: 5d2a4b875093135a2e2f3c7356b249108c2f6812

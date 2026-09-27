@@ -42,7 +42,7 @@ const CODING_TOOLS = ['bash', 'pwsh', 'read', 'write', 'edit', 'glob', 'grep', '
 
 /**
  * A generous ceiling. The three-tool surface measured ~1,133 tokens; the
- * five-tool surface Phase 4A adds measures ~2,087, because the image tools carry
+ * five-tool surface Phase 4A adds measures ~2,100, because the image tools carry
  * the visible-evidence boundary in their own descriptions — that is where a model
  * reads it, immediately before calling them. The ceiling leaves roughly a quarter
  * of headroom for wording edits while still catching a row that widens the
@@ -54,8 +54,8 @@ const TOKEN_BUDGET = 2600
  * Booting the real Loader here pulls this bundle's ~30 workspace packages
  * through the test transform. Cold — a fresh clone, or CI, where nothing is
  * cached — that graph costs tens of seconds; the 5 s default only holds once it
- * is warm. Raising the ceiling relaxes no assertion: a surface that published a
- * fourth tool still fails, it just fails on the assertion instead of on a
+ * is warm. Raising the ceiling relaxes no assertion: a surface that published an
+ * extra tool still fails, it just fails on the assertion instead of on a
  * stopwatch.
  */
 const BOOT_TIMEOUT = 120_000

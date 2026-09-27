@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## Summary
 
-医疗接诊 Agent 的黄金用例评测：把「一次问诊必须做到什么」写成可版本化的数据，经真实 agent loop 针对脚本化模型或真实模型回放。判定依据是运行时派生出的权威病例状态，从不依据 assistant 的文案。纯函数 Evaluator 把每一轮变成已评估的断言，报告逐维度统计而不把一次运行压成一个分数。它只是测试基础设施：不注册任何工具、不发布任何服务，所以医疗 Agent 的模型可见面仍然只有三个工具。
+医疗接诊 Agent 的黄金用例评测：把「一次问诊必须做到什么」写成可版本化的数据，经真实 agent loop 针对脚本化模型或真实模型回放。判定依据是运行时派生出的权威病例状态，从不依据 assistant 的文案。纯函数 Evaluator 把每一轮变成已评估的断言，报告逐维度统计而不把一次运行压成一个分数。它只是测试基础设施：不注册任何工具、不发布任何服务，所以医疗 Agent 的模型可见面仍然只有五个工具。
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ pnpm medharness:eval --case get-reads-without-changing   # one named case
 pnpm medharness:eval --all                               # the whole roster
 ```
 
-`runLiveEval` 通过 app-boot loader 启动 **shipped 的 `medharness` profile**——真实的 profile 目录、真实的 bundle 层、`dsh` launcher 使用的那个被修复过的 module fallback——自己不挂载任何插件，所以基准测的是真正交付的组合，而不是它的二次拼装。有两处刻意的减法，并且在源码里写明：排除 `@deepseek-ai/dsh-headless` 这组一次性 CLI 行（它们会去驱动自己的任务），并跳过 profile 的用户层（否则一处本机 patch 就能重新定义「shipped profile」的含义）。仅跳过 patch 层还不够：`app-boot` 只会在 profile manifest 的 `dsh.profile.bundles` 仍等于 shipped 模板时才做归一化，其它任何列表都按「用户自有」原样保留，于是一份手改过的 `package.json` 照样会被启动、并且照样被报告成 shipped。因此这次运行会断言「载入的 profile 恰好组合了 shipped 的那几个 bundle」，不符合就拒绝测量——是拒绝，不是修复：被拒的 profile 会被原样留在那里。报告记录的是**启动后的组合自己解析出来的 route**，一次运行里的每个用例都必须解析出同一条 route，否则根本不会写出报告；并且一旦组合发布了三个医疗工具之外的任何东西，这次运行会直接拒绝。
+`runLiveEval` 通过 app-boot loader 启动 **shipped 的 `medharness` profile**——真实的 profile 目录、真实的 bundle 层、`dsh` launcher 使用的那个被修复过的 module fallback——自己不挂载任何插件，所以基准测的是真正交付的组合，而不是它的二次拼装。有两处刻意的减法，并且在源码里写明：排除 `@deepseek-ai/dsh-headless` 这组一次性 CLI 行（它们会去驱动自己的任务），并跳过 profile 的用户层（否则一处本机 patch 就能重新定义「shipped profile」的含义）。仅跳过 patch 层还不够：`app-boot` 只会在 profile manifest 的 `dsh.profile.bundles` 仍等于 shipped 模板时才做归一化，其它任何列表都按「用户自有」原样保留，于是一份手改过的 `package.json` 照样会被启动、并且照样被报告成 shipped。因此这次运行会断言「载入的 profile 恰好组合了 shipped 的那几个 bundle」，不符合就拒绝测量——是拒绝，不是修复：被拒的 profile 会被原样留在那里。报告记录的是**启动后的组合自己解析出来的 route**，一次运行里的每个用例都必须解析出同一条 route，否则根本不会写出报告；并且一旦组合发布了五个医疗工具之外的任何东西，这次运行会直接拒绝。
 
 Live 失败也是结果。这里不修用例、不放宽期望、不重跑到碰巧通过；失败分类、expected/actual、以及日志里的 seq 都会和其它运行一样落进报告。报告写入 `.medharness/eval-runs/`，与 session 日志放在一起，而不是进版本历史。
 
@@ -181,7 +181,7 @@ Runner 不构建服务、不注册工具、不知道模型。在 harness 内部�
 两者都按决定未接线：本阶段只新增离线基础设施。
 
 - **Bad-case 收集。** `ctx.messageFeedback.list({ sessionId })` 离线读取持久化的逐消息评分，因此负面反馈可以成为真实的生产用例来源。反馈以**非 surface** 事件存储，所以它永不进入模型历史 —— 这是工具自身 spec 钉住的性质。
-- **用例发现。** `ctx.sessionQuery` 在 host 平面读取、过滤、追踪持久会话。把这项能力暴露给模型的 `session_search` 系列工具不进入医疗 Agent：收集器是离线消费者而非能力，而模型可见面保持三个工具。
+- **用例发现。** `ctx.sessionQuery` 在 host 平面读取、过滤、追踪持久会话。把这项能力暴露给模型的 `session_search` 系列工具不进入医疗 Agent：收集器是离线消费者而非能力，而模型可见面保持五个工具。
 
 </details>
 

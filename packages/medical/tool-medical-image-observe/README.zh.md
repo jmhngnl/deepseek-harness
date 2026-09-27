@@ -9,7 +9,9 @@ kind: "package-reference"
 
 ## 摘要
 
-`medical_image_observe` 记录模型在一张用户附加到对话里的图像中**直接可见**的内容。模型已经看过这张图了——这正是图片出现在它请求里的原因——所以本工具不读取图像、不调用模型，也不从字节重新推导任何东西。它接收模型的结构化陈述，交给 `ctx.medicalImage`，并返回权威观察。
+`medical_image_observe` 记录模型在一张用户附加到对话里的图像中**直接可见**的内容。模型已经看过这张图了，所以本工具不读取它、不调用模型，也不从字节重新推导任何东西。它接收模型的结构化陈述，交给 `ctx.medicalImage`，并返回权威观察。
+
+每次调用记录的是某一张附加图像**当前完整的**观察。每个字段都必填，所以这是完整快照而不是 patch：不要为了保留旧值而省略字段。
 
 ## 目录
 
@@ -35,22 +37,37 @@ kind: "package-reference"
 
 ### 模型提供什么
 
-| 参数 | 必填 | 含义 |
+每个字段都必填。省略任何一个都是 schema 错误，而不是「保留旧值」的请求。
+
+| 参数 | 类型 | 含义 |
 | --- | --- | --- |
-| `attachmentId` | 是 | 图片旁显示的 id。会对着本会话解析。 |
-| `usable` | 是 | 图像中是否有任何部分可被描述。 |
-| `bodyRegion` | 否 | 图像所示部位，按模型自己的说法。 |
-| `findings` | 否 | 直接可见的发现，每条一个短句。 |
-| `qualityIssues` | 否 | `blur`、`poor_lighting`、`occlusion`、`too_distant`、`unable_to_assess`。 |
-| `uncertainty` | 否 | 从这张图无法判定的内容。 |
+| `attachmentId` | string | 图片旁显示的 id。会对着本会话解析。 |
+| `bodyRegion` | string **或 null** | 图像所示部位；无法陈述任何部位时显式传 null。 |
+| `findings` | string[] | 全部直接可见的发现，每条一个短句。空数组是合法的。 |
+| `usable` | boolean | 图像中是否有任何部分可被描述。 |
+| `qualityIssues` | string[] | `blur`、`poor_lighting`、`occlusion`、`too_distant`、`unable_to_assess`。空数组是合法的。 |
+| `uncertainty` | string[] | 全部无法判定的内容。空数组是合法的。 |
+
+`bodyRegion` 刻意做成「必填且可为 null」：「无法陈述任何部位」是一件值得记录的事实，与「调用方漏了这个字段」不是一回事。空白字符串两者都不是——领域会拒绝它，而不是把它折成 null。
 
 没有 media type、字节长度或尺寸参数，也没有诊断、疾病、治疗、药物、风险或置信度参数。前者属于 harness 该知道的，后者不是本工具该记录的。
 
 ### harness 拿它做什么
 
-attachment id 会对着会话自己派生出的转录解析，被持久化的引用是会话的 canonical `ImageAttachmentRef`。从未在此附加过的 id——包括属于另一个会话的 id——会以 `IMAGE_ATTACHMENT_NOT_IN_SESSION` 被拒绝。
+attachment id 会对着会话自己派生出的转录解析，被持久化的引用是会话的 canonical `ImageAttachmentRef`。从未在此附加过的 id——包括属于另一个会话的 id——会以 `IMAGE_ATTACHMENT_NOT_IN_SESSION` 被拒绝。引用本身在 update 之间不可变：fold 会拒绝任何重写它的持久记录。
 
-什么都没记录的新提交不写事件、revision 不变。同一附件的任何其它提交则把 revision 推进一格。
+### 完整快照，而不是 patch
+
+持久事件是一份完整的观察，所以线上契约说的是同一件事：一次调用声明当前完整的观察。
+
+| 调用 | 结果 |
+| --- | --- |
+| 某附件的第一次快照 | 一条 `observe` 事件，revision 1 |
+| 逐字节相同的快照再来一次 | 不写事件，revision 不变 |
+| 记录了任何不同内容的快照 | 一条 `update` 事件，revision + 1 |
+| 快照省略了上一份有的一条发现 | 该发现**真的消失**：没有任何东西会保留它 |
+
+patch 形态的工具会让模型仅仅因为忘记重复就悄悄丢掉一条发现，revision 也就不再意味着「观察者改了他的陈述」。
 
 ### 可见证据的边界
 

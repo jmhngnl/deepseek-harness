@@ -216,6 +216,10 @@ function base64Length(bytes: number): number {
  * Exported because the nesting rule is a contract, not an implementation detail:
  * a consumer that walks content itself can silently diverge on nesting depth and
  * then disagree with every other image policy about what a message contains.
+ *
+ * The visit is read-only. A visited block belongs to the message it came from —
+ * in derived history that message is deep-frozen — so a consumer reports what it
+ * finds instead of rewriting it here.
  * @param content - typed model content blocks.
  * @param visit - called once per occurrence, in message order.
  */

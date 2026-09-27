@@ -53,12 +53,24 @@ An id this session never carried is refused, and so is an id belonging to anothe
 
 | Situation | Result |
 | --- | --- |
-| First observation of an attachment | one `observe` event, revision 1 |
-| The same fields recorded again | **no event**, no revision change |
-| A recorded field changes | one `update` event, revision + 1 |
+| First snapshot of an attachment | one `observe` event, revision 1 |
+| The identical snapshot recorded again | **no event**, no revision change |
+| A snapshot recording anything different | one `update` event, revision + 1 |
 | Several attachments in one session | one observation each, addressed by attachment |
 
 The revision counts durable changes, not tool calls, so a restatement that records nothing new cannot inflate it.
+
+### The request is a full snapshot
+
+`ImageObservationRequest` carries every field, and `bodyRegion` is required and nullable. There is no patch shape and no "keep the previous value" behaviour, so a restatement that omits a finding removes it. That matches the durable event, which carries a complete observation rather than a delta — the wire contract and the log now say the same thing.
+
+`bodyRegion` is required rather than optional so that "no region can be stated" is recorded as an explicit null instead of being indistinguishable from a caller that forgot the field. A blank string is a third case and is refused.
+
+### The attachment is immutable across an update
+
+Only the observation may change. `sameAttachmentRef` compares every field of the reference — including whether an optional `name` or `originalDimensions` is present at all, so adding or dropping one is refused too — and the fold rejects an update that rewrites any of them. The check runs before the revision check, so a rewritten image is reported as a rewritten image rather than as a revision mistake.
+
+The fold owns this rule because it is the only place that can still see both versions of the reference: once an update is applied the earlier one is gone from the projection, and replay never consults the attachment service. A durable stream has to be decidable on its own.
 
 ### Reading
 

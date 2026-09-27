@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The medical group holds domain capabilities for medical consultation and intake assistance built on the harness. Unlike the harness capability groups, these packages solve no part of the agent runtime: their subject is a case, not a codebase. The group ships a session-backed case domain, `medical-case`, plus three model-facing tools that record the case, change it, and read it back. A case is intake-collection state: the domain records, updates, and replays the facts a user has stated, reports what is still missing, and lets the agent ask instead of guessing. Nothing here diagnoses, prescribes, or assesses risk.
+The medical group holds domain capabilities for medical consultation and intake assistance. Unlike the harness capability groups, these packages solve no part of the agent runtime: their subject is a case, not a codebase. The group ships a session-backed case domain plus five model-facing tools: three for the patient-reported case and two for what the model observed in an attached image. A case is intake-collection state: the domain records, updates, and replays the facts a user stated, reports what is still missing, and lets the agent ask instead of guess. Nothing diagnoses, prescribes, or assesses risk.
 
 ## Table of Contents
 

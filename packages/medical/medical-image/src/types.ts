@@ -91,20 +91,34 @@ export interface MedicalImageObservation {
   readonly updatedAt: number
 }
 
-/** What one observation attempt asks for, before the canonical reference is resolved. */
+/**
+ * One COMPLETE observation of one image, as the model states it.
+ *
+ * This is a full snapshot, not a patch. Every field is required, so each call
+ * declares the whole current observation for that image: an omitted field is a
+ * schema error, never a request to keep an older value. A patch-shaped tool would
+ * let a model silently drop a finding it merely forgot to repeat, and the durable
+ * event is a full state anyway — so the wire contract now says the same thing the
+ * log does.
+ *
+ * `bodyRegion` is required AND nullable on purpose. "The observer did not state a
+ * region" is a fact worth recording, and it is not the same as the caller having
+ * omitted the field. A blank string is neither of those, so it is refused rather
+ * than quietly folded into null.
+ */
 export interface ImageObservationRequest {
   /** Attachment the model saw; resolved against the current session, never trusted as metadata. */
   readonly attachmentId: string
-  /** Body region as the observer phrased it; omit when not stated. */
-  readonly bodyRegion?: string
-  /** Directly visible findings; omit or pass an empty list when none are describable. */
-  readonly findings?: string[]
+  /** The body region the image shows, or an explicit null when none can be stated. */
+  readonly bodyRegion: string | null
+  /** Directly visible findings; an empty list is valid and is not a missing field. */
+  readonly findings: string[]
   /** Whether any part of the image could be described. */
   readonly usable: boolean
-  /** Limitations observed; omit when the image has none. */
-  readonly qualityIssues?: ImageQualityIssue[]
-  /** What could not be determined from this image. */
-  readonly uncertainty?: string[]
+  /** Limitations observed; an empty list is valid. */
+  readonly qualityIssues: ImageQualityIssue[]
+  /** What could not be determined from this image; an empty list is valid. */
+  readonly uncertainty: string[]
 }
 
 /** Outcome of one accepted observation attempt. */
