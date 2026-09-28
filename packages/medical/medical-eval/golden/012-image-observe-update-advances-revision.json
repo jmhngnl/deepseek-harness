@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-update-advances-revision",
+  "description": "The same image observed twice with different full snapshots: the second call appends one update record, advances the revision to two, and keeps the canonical attachment identity of the first observation.",
+  "turns": [
+    {
+      "user": "我拍了一张照片，你看看",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "findings": ["red patch"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    },
+    {
+      "user": "我再看了一遍，边缘还有些脱屑",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 2,
+            "findings": ["red patch", "scaling at the border"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "update", "revision": 2 }
+          ]
+        }
+      }
+    }
+  ]
+}

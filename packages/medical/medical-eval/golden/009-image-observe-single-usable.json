@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-single-usable",
+  "description": "One usable synthetic image attached to a turn: the model observes it once, the harness admits the fixture through the real attachment service, and the authoritative observation records revision one with the exact fields the model stated.",
+  "turns": [
+    {
+      "user": "我拍了一张照片，你看看",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_image_observe",
+              "arguments": {
+                "usable": true
+              }
+            }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "bodyRegion": "forearm",
+            "findings": ["red patch"],
+            "usable": true,
+            "qualityIssues": [],
+            "uncertainty": []
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    }
+  ]
+}

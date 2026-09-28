@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-unusable-image",
+  "description": "One deliberately unresolvable synthetic image: the model reports it as unusable with named quality limitations instead of inventing a finding, and the authoritative observation records that verdict at revision one.",
+  "turns": [
+    {
+      "user": "这张照片能看清吗",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-low-quality" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            {
+              "name": "medical_image_observe",
+              "arguments": {
+                "usable": false
+              }
+            }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "bodyRegion": null,
+            "findings": [],
+            "usable": false,
+            "qualityIssues": ["blur", "poor_lighting"],
+            "uncertainty": ["no resolvable structure"]
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "update-completes-the-record",
   "description": "A follow-up that supplies the facts the first contact left open completes the same case at a second revision instead of opening another.",
   "turns": [

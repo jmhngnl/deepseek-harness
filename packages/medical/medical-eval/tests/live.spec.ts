@@ -16,14 +16,18 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-app-boot'
-import type {} from '@deepseek-ai/dsh-llm'
+import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { visitImageBlocks } from '@deepseek-ai/dsh-llm'
+import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import { buildReport, createRunId } from '../src/index.ts'
 import type { EvalReport, GoldenCase } from '../src/index.ts'
 import {
   LIVE_MEDICAL_TOOLS,
   LIVE_PROFILE,
   SMOKE_CASE_IDS,
+  assertImageCapable,
   assertMedicalSurface,
   assertShippedProfile,
   assertSingleRoute,
@@ -185,9 +189,10 @@ describe('the statements a live report makes about itself', () => {
     // The counts are asserted as a shape here and as values by the booted run
     // below; a renderer test should not invent numbers a run never produced.
     expect(lines[1]).toMatch(/^cases=\d+\/\d+ passed routing=\d+\/\d+ state=\d+\/\d+ missingFields=\d+\/\d+$/)
-    expect(lines[2]).toMatch(/^toolErrors=\d+ unexpectedMutations=\d+ timeouts=\d+ runtimeErrors=\d+$/)
-    expect(lines[3]).toMatch(/^usage input=\d+ output=\d+ turns=\d+\/\d+ complete=(?:true|false)$/)
-    expect(lines[4]).toMatch(/^latency totalMs=\d+$/)
+    expect(lines[2]).toMatch(/^image=\d+\/\d+ imageMutation=\d+\/\d+ unexpectedImageMutations=\d+$/)
+    expect(lines[3]).toMatch(/^toolErrors=\d+ unexpectedMutations=\d+ timeouts=\d+ runtimeErrors=\d+$/)
+    expect(lines[4]).toMatch(/^usage input=\d+ output=\d+ turns=\d+\/\d+ complete=(?:true|false)$/)
+    expect(lines[5]).toMatch(/^latency totalMs=\d+$/)
     expect(lines).toContain('PASS some-case')
     expect(lines).toContain('report=/tmp/run.json')
   })
@@ -202,7 +207,7 @@ describe('the statements a live report makes about itself', () => {
       detail: 'the model wrote to the record a read-only turn must leave alone',
       expected: 'medical_case_get',
       actual: 'medical_case_update',
-      evidence: { toolCallSeqs: [4], toolResultSeqs: [5], caseEventSeqs: [7] },
+      evidence: { toolCallSeqs: [4], toolResultSeqs: [5], caseEventSeqs: [7], imageEventSeqs: [] },
     }])
     const lines = renderLiveSummary(report, '/tmp/run.json')
 
@@ -347,7 +352,7 @@ describe('a booted live run', () => {
       onRuntimeReady: (ctx) => { ctx.llm.registerAdapter([MOCK_ROUTE.provider], adapter) },
     })
 
-    expect(result.report.schemaVersion).toBe(1)
+    expect(result.report.schemaVersion).toBe(2)
     expect(result.report.runtime).toEqual({
       profile: LIVE_PROFILE,
       provider: MOCK_ROUTE.provider,
@@ -404,6 +409,47 @@ describe('a booted live run', () => {
     expect(printed).toContain('FAIL intake-first-contact-two-symptoms')
     expect(printed.some(line => line.includes('SESSION_TIMEOUT'))).toBe(true)
   }, BOOT_TIMEOUT)
+
+  it('replays an image case through the shipped profile', async () => {
+    const adapter = new MockAdapter([
+      (options) => {
+        const ids: string[] = []
+        for (const message of options.messages) {
+          visitImageBlocks(message.content, (block) => { ids.push(String(block.attachment.attachmentId)) })
+        }
+        return toolCallResponse('c1', 'medical_image_observe', {
+          attachmentId: ids[0],
+          bodyRegion: 'forearm',
+          findings: ['red disc on a light background'],
+          usable: true,
+          qualityIssues: [],
+          uncertainty: [],
+        })
+      },
+      textResponse('已记录。'),
+    ])
+    const root = mkdtempSync(join(tmpdir(), 'medharness-live-eval-image-'))
+
+    const result = await runLiveEval({
+      root,
+      cases: [rosterCase('image-live-smoke-visible-patch')],
+      route: MOCK_ROUTE,
+      onRuntimeReady: (ctx) => { ctx.llm.registerAdapter([MOCK_ROUTE.provider], adapter) },
+    })
+
+    // The image path runs against the SHIPPED composition: the profile's own
+    // attachment store admits the fixture, and the profile's own image tools
+    // record the observation.
+    expect(result.report.cases[0]?.failures).toEqual([])
+    expect(result.report.summary.casesPassed).toBe(1)
+    expect(result.report.summary.imageAssertionsTotal).toBeGreaterThan(0)
+    expect(result.report.summary.imageAssertionsPassed).toBe(result.report.summary.imageAssertionsTotal)
+    expect(result.report.summary.imageMutationAssertionsTotal).toBe(3)
+    expect(result.report.summary.imageMutationAssertionsPassed).toBe(3)
+    expect(result.report.cases[0]?.turns[0]?.imageObservations[0]?.imageKey).toBe('image-1')
+    expect(result.report.cases[0]?.turns[0]?.imageObservations[0]?.findings)
+      .toEqual(['red disc on a light background'])
+  }, BOOT_TIMEOUT)
 })
 
 /**
@@ -424,3 +470,56 @@ function reportWith(failures: EvalReport['cases'][number]['failures']): EvalRepo
   })
   return { ...base, cases: [{ id: 'some-case', passed: failures.length === 0, turns: [], failures }] }
 }
+
+// ── The image capability guard ─────────────────────────────────────────────
+
+/** A scripted route that declares the modalities it accepts, and nothing else. */
+class DeclaredModalityAdapter extends MockAdapter {
+  constructor(private readonly modalities: readonly string[] | undefined) {
+    super([])
+  }
+
+  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    return Promise.resolve({
+      provider,
+      id: model,
+      name: model,
+      ...this.modalities === undefined ? {} : { inputModalities: this.modalities as never },
+    })
+  }
+}
+
+/** A context whose LLM service serves one declared route. */
+async function routeContext(modalities: readonly string[] | undefined): Promise<Context> {
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  ctx.llm.registerAdapter(['declared'], new DeclaredModalityAdapter(modalities))
+  return ctx
+}
+
+describe('the image capability guard', () => {
+  it('accepts a route that declares image input', async () => {
+    const ctx = await routeContext(['text', 'image'])
+    await expect(assertImageCapable(ctx, 'declared', 'model')).resolves.toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts a route that declares no modalities, because unknown is not text-only', async () => {
+    const ctx = await routeContext(undefined)
+    await expect(assertImageCapable(ctx, 'declared', 'model')).resolves.toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses a text-only route rather than letting the run degrade into a text smoke', async () => {
+    const ctx = await routeContext(['text'])
+    await expect(assertImageCapable(ctx, 'declared', 'model')).rejects.toThrow(/declares text\. A run against it/)
+    await expect(assertImageCapable(ctx, 'declared', 'model')).rejects.toThrow(/measure a text smoke/)
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses a composition that published no LLM service', async () => {
+    const ctx = new Context()
+    await expect(assertImageCapable(ctx, 'declared', 'model')).rejects.toThrow(/published no LLM service/)
+    await ctx.fiber.dispose()
+  })
+})

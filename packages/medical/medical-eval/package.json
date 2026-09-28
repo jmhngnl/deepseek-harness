@@ -22,6 +22,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "fixtures",
     "golden",
     "lib/index.js",
     "lib/types/**/*.d.ts"
@@ -32,8 +33,10 @@
     "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-agent-default-model": "workspace:^",
     "@deepseek-ai/dsh-app-boot": "workspace:^",
+    "@deepseek-ai/dsh-attachment": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-medical-case": "workspace:^",
+    "@deepseek-ai/dsh-medical-image": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-util-values": "workspace:^"
@@ -45,14 +48,19 @@
     "@deepseek-ai/dsh-agent-loop": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
     "@deepseek-ai/dsh-app-boot": "workspace:^",
+    "@deepseek-ai/dsh-attachment": "workspace:^",
+    "@deepseek-ai/dsh-attachment-local": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-medical-case": "workspace:^",
+    "@deepseek-ai/dsh-medical-image": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-tool-medical-case-get": "workspace:^",
     "@deepseek-ai/dsh-tool-medical-case-intake": "workspace:^",
     "@deepseek-ai/dsh-tool-medical-case-update": "workspace:^",
+    "@deepseek-ai/dsh-tool-medical-image-get": "workspace:^",
+    "@deepseek-ai/dsh-tool-medical-image-observe": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-util-values": "workspace:^"
   }

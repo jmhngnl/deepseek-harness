@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "intake-complete-first-contact",
   "description": "A first contact carrying every required fact records the case in one call and reports nothing missing.",
   "turns": [

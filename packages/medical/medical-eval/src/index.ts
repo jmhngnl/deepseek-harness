@@ -36,8 +36,10 @@ export {
   isJson,
 } from './runtime.ts'
 export { loadGoldenCases, parseGoldenCase } from './golden.ts'
+export { fixtureCatalog, fixtureIds, loadImageFixture } from './fixtures.ts'
+export type { LoadedImageFixture } from './fixtures.ts'
 export { observeTurn } from './observe.ts'
-export type { TurnObservationInput } from './observe.ts'
+export type { AdmittedImage, TurnObservationInput } from './observe.ts'
 export { evaluateCase, evaluateTurn } from './evaluate.ts'
 export type { CaseEvaluationInput } from './evaluate.ts'
 export { buildReport, createRunId, evalRunsDirectory, writeEvalReport } from './report.ts'
@@ -50,6 +52,7 @@ export {
   LIVE_PROFILE,
   SMOKE_CASE_IDS,
   liveRoster,
+  assertImageCapable,
   liveRuntime,
   parseLiveArgs,
   renderLiveArgsErrors,

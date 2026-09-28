@@ -26,6 +26,9 @@ import type {
   FailureType,
   GoldenCase,
   GoldenTurn,
+  ImageMutationEventExpectation,
+  ImageMutationExpectation,
+  ImageObservationExpectation,
   MutationExpectation,
   ObservedToolCall,
   ObservedTurn,
@@ -76,6 +79,8 @@ export function evaluateTurn(expected: TurnExpectation, observed: ObservedTurn):
     ...evaluateToolErrors(observed),
     ...evaluateCaseState(expected.caseState, observed),
     ...evaluateMutation(expected.mutation, observed),
+    ...evaluateImageObservations(expected.imageObservations, observed),
+    ...evaluateImageMutation(expected.imageMutation, observed),
   ]
 }
 
@@ -121,6 +126,7 @@ function evaluateGoldenTurn(
     toolCalls: observed.toolCalls.map(call => call.name),
     usage: observed.usage,
     caseState: observed.caseState,
+    imageObservations: observed.imageObservations,
   }
 }
 
@@ -141,6 +147,7 @@ function unobservedTurn(goldenTurn: GoldenTurn, index: number, detail: string): 
     toolCalls: [],
     usage: null,
     caseState: null,
+    imageObservations: [],
   }
 }
 
@@ -427,6 +434,233 @@ function magnitude(value: JsonValue): number {
 }
 
 /**
+ * Assert the fields of the authoritative image observations an expectation pins.
+ *
+ * The comparison is against the domain's own value, never against what a tool
+ * call claimed to record: the whole point of the image domain is that a model
+ * saying "observed" and a projection holding no observation can disagree, and
+ * only one of them is evidence.
+ *
+ * An expectation naming an image the session holds no observation for fails
+ * once, on that image, rather than producing one failure per pinned field.
+ */
+function evaluateImageObservations(
+  expectations: readonly ImageObservationExpectation[] | undefined,
+  observed: ObservedTurn,
+): EvaluationResult[] {
+  if (expectations === undefined) return []
+  return expectations.flatMap(expectation => evaluateImageObservation(expectation, observed))
+}
+
+/** Assert one image's observation. */
+function evaluateImageObservation(
+  expectation: ImageObservationExpectation,
+  observed: ObservedTurn,
+): EvaluationResult[] {
+  const stored = observed.imageObservations.find(candidate => candidate.imageKey === expectation.imageKey)
+  if (stored === undefined) {
+    return [{
+      kind: 'imageState',
+      assertion: `${expectation.imageKey} observation`,
+      failureType: 'IMAGE_OBSERVATION_MISMATCH',
+      detail: `the expectation describes an observation of ${JSON.stringify(expectation.imageKey)}, but this session holds none for that image`,
+      expected: 'a recorded image observation',
+      actual: null,
+      evidence: evidence(observed),
+    }]
+  }
+  const results: EvaluationResult[] = []
+  if (expectation.bodyRegion !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} bodyRegion`, expectation.bodyRegion, stored.bodyRegion, 'IMAGE_OBSERVATION_MISMATCH', observed,
+    ))
+  }
+  if (expectation.findings !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} findings`, [...expectation.findings], [...stored.findings], 'IMAGE_OBSERVATION_MISMATCH', observed,
+    ))
+  }
+  if (expectation.minimumFindings !== undefined) {
+    results.push(compareImageMinimumFindings(
+      expectation.imageKey, expectation.minimumFindings, stored.findings.length, observed,
+    ))
+  }
+  if (expectation.usable !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} usable`, expectation.usable, stored.usable, 'IMAGE_OBSERVATION_MISMATCH', observed,
+    ))
+  }
+  if (expectation.qualityIssues !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} qualityIssues`, [...expectation.qualityIssues], [...stored.qualityIssues], 'IMAGE_OBSERVATION_MISMATCH', observed,
+    ))
+  }
+  if (expectation.uncertainty !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} uncertainty`, [...expectation.uncertainty], [...stored.uncertainty], 'IMAGE_OBSERVATION_MISMATCH', observed,
+    ))
+  }
+  if (expectation.revision !== undefined) {
+    results.push(compareImageField(
+      `${expectation.imageKey} revision`, expectation.revision, stored.revision, 'IMAGE_REVISION_MISMATCH', observed,
+    ))
+  }
+  return results
+}
+
+/** Compare one expected image field against the authoritative one and classify a difference. */
+function compareImageField(
+  assertion: string,
+  expected: JsonValue,
+  actual: JsonValue,
+  failureType: FailureType,
+  observed: ObservedTurn,
+): EvaluationResult {
+  const matched = deepEqualJson(expected, actual)
+  return {
+    kind: 'imageState',
+    assertion,
+    failureType: matched ? null : failureType,
+    detail: matched
+      ? `${assertion} matched`
+      : `${assertion} must be ${JSON.stringify(expected)}; the observation holds ${JSON.stringify(actual)}`,
+    expected,
+    actual,
+    evidence: evidence(observed),
+  }
+}
+
+/**
+ * Assert a lower bound on the finding count.
+ *
+ * A live observer's wording is not reproducible, so a live case cannot pin the
+ * sentence it will produce — but it can honestly assert that the observer found
+ * something. This is the assertion that keeps a smoke meaningful without
+ * turning it into a phrasing lottery.
+ */
+function compareImageMinimumFindings(
+  imageKey: string,
+  minimum: number,
+  actual: number,
+  observed: ObservedTurn,
+): EvaluationResult {
+  const matched = actual >= minimum
+  return {
+    kind: 'imageState',
+    assertion: `${imageKey} minimumFindings`,
+    failureType: matched ? null : 'IMAGE_OBSERVATION_MISMATCH',
+    detail: matched
+      ? `${imageKey} recorded ${String(actual)} finding(s), at least the required ${String(minimum)}`
+      : `${imageKey} must record at least ${String(minimum)} finding(s); the observation holds ${String(actual)}`,
+    expected: `at least ${String(minimum)} findings`,
+    actual,
+    evidence: evidence(observed),
+  }
+}
+
+/** Assert what the turn did to the durable image-observation records. */
+function evaluateImageMutation(
+  expectation: ImageMutationExpectation | undefined,
+  observed: ObservedTurn,
+): EvaluationResult[] {
+  if (expectation === undefined) return []
+  const appended = observed.imageEvents.length
+  const results: EvaluationResult[] = []
+  if (expectation.changed !== undefined) {
+    results.push(compareImageMutation('durable image change', expectation.changed, appended > 0, observed))
+  }
+  if (expectation.eventCountDelta !== undefined) {
+    results.push(compareImageMutation('image records appended', expectation.eventCountDelta, appended, observed))
+  }
+  if (expectation.events !== undefined) {
+    results.push(compareImageEvents(expectation.events, observed))
+  }
+  return results
+}
+
+/** Compare one image mutation count or boolean against the expectation. */
+function compareImageMutation(
+  assertion: string,
+  expected: JsonValue,
+  actual: JsonValue,
+  observed: ObservedTurn,
+): EvaluationResult {
+  const base = {
+    kind: 'imageMutation' as const,
+    assertion,
+    expected,
+    actual,
+    evidence: evidence(observed),
+  }
+  if (deepEqualJson(expected, actual)) return { ...base, failureType: null, detail: `${assertion} matched` }
+  return {
+    ...base,
+    failureType: magnitude(actual) < magnitude(expected)
+      ? 'EXPECTED_IMAGE_MUTATION_MISSING'
+      : 'UNEXPECTED_IMAGE_MUTATION',
+    detail: `${assertion} must be ${JSON.stringify(expected)}; the turn produced ${JSON.stringify(actual)}`,
+  }
+}
+
+/**
+ * Compare the durable image records a turn appended against the ones an
+ * expectation pins, positionally.
+ *
+ * A length difference is a missing or an extra record; a field difference at a
+ * position is classified by which field it is, because "the turn wrote about
+ * the wrong image" and "the turn advanced the wrong revision" lead to different
+ * fixes.
+ */
+function compareImageEvents(
+  expected: readonly ImageMutationEventExpectation[],
+  observed: ObservedTurn,
+): EvaluationResult {
+  const actual = observed.imageEvents.map(event => ({
+    imageKey: event.imageKey,
+    operation: event.operation,
+    revision: event.revision,
+  }))
+  const base = {
+    kind: 'imageMutation' as const,
+    assertion: 'image records',
+    expected: expected.map(entry => ({ ...entry })),
+    actual,
+    evidence: evidence(observed),
+  }
+  if (expected.length !== actual.length) {
+    return {
+      ...base,
+      failureType: actual.length < expected.length ? 'EXPECTED_IMAGE_MUTATION_MISSING' : 'UNEXPECTED_IMAGE_MUTATION',
+      detail: `the turn appended ${String(actual.length)} image record(s) where the expectation requires ${String(expected.length)}`,
+    }
+  }
+  for (const [index, want] of expected.entries()) {
+    const got = actual[index]
+    /* v8 ignore next -- the lengths were just proven equal, so every index has an entry */
+    if (got === undefined) continue
+    const failureType = imageEventMismatch(want, got)
+    if (failureType !== null) {
+      return {
+        ...base,
+        failureType,
+        detail: `image record ${String(index)} must be ${JSON.stringify(want)}; the turn appended ${JSON.stringify(got)}`,
+      }
+    }
+  }
+  return { ...base, failureType: null, detail: 'image records matched' }
+}
+
+/** How one pinned image record differs from the one the turn appended. */
+function imageEventMismatch(
+  want: ImageMutationEventExpectation,
+  got: { readonly imageKey: string | null; readonly operation: string; readonly revision: number },
+): FailureType | null {
+  if (want.imageKey !== got.imageKey || want.operation !== got.operation) return 'UNEXPECTED_IMAGE_MUTATION'
+  if (want.revision !== undefined && want.revision !== got.revision) return 'IMAGE_REVISION_MISMATCH'
+  return null
+}
+
+/**
  * Assert the invariants that span a case's revisions.
  *
  * Identity and timestamps have no deterministic value to compare, so what is
@@ -540,10 +774,11 @@ function evidence(observed: ObservedTurn): EvaluationEvidence {
     toolCallSeqs: observed.toolCalls.map(call => call.eventSeq),
     toolResultSeqs: observed.toolResults.map(result => result.eventSeq),
     caseEventSeqs: observed.caseEvents.map(event => event.eventSeq),
+    imageEventSeqs: observed.imageEvents.map(event => event.eventSeq),
   }
 }
 
 /** Evidence for a finding that refers to no particular event. */
 function noEvidence(): EvaluationEvidence {
-  return { toolCallSeqs: [], toolResultSeqs: [], caseEventSeqs: [] }
+  return { toolCallSeqs: [], toolResultSeqs: [], caseEventSeqs: [], imageEventSeqs: [] }
 }

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-two-images",
+  "description": "Two different synthetic images in one message: each is admitted separately, each gets its own observation at revision one, and a later read leaves both observations standing, so the second image is never lost behind the first.",
+  "turns": [
+    {
+      "user": "这两张照片都看一下",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" },
+        { "key": "image-2", "fixture": "synthetic-second-view" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" },
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "findings": ["red patch"],
+            "usable": true
+          },
+          {
+            "imageKey": "image-2",
+            "revision": 1,
+            "findings": ["blue square"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 2,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 },
+            { "imageKey": "image-2", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    },
+    {
+      "user": "第二张记录里还在吗",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_get" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "findings": ["red patch"],
+            "usable": true
+          },
+          {
+            "imageKey": "image-2",
+            "revision": 1,
+            "findings": ["blue square"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": false,
+          "eventCountDelta": 0
+        }
+      }
+    }
+  ]
+}

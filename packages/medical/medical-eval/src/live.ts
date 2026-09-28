@@ -34,10 +34,22 @@
  * states what it measured rather than assuming it, and refuses rather than
  * reports loosely: the loaded profile must still compose the shipped bundles,
  * and the booted composition must publish exactly the medical tools this profile ships. A
- * profile whose bundles were edited, or a composition that gained a fourth
+ * profile whose bundles were edited, or a composition that gained an extra
  * tool, fails the run rather than silently widening what the numbers below
  * describe. Neither guard repairs anything — an edited profile is a refusal,
  * not a profile to rewrite.
+ *
+ * A case that attaches images gets one more guard before its first request: the
+ * route the composition resolved must accept image input. Without it a text-only
+ * route would not fail — the harness would project every image to placeholder
+ * text and the run would quietly measure a text smoke while calling itself a
+ * vision one.
+ *
+ * Where a live run keeps its attachments is the shipped composition's business,
+ * not this runner's: `attachment-local` resolves its root from the profile's own
+ * configuration, exactly as `session-persistence-jsonl` resolves where sessions
+ * go. Measuring the shipped composition means using the store it ships with,
+ * rather than a second one the benchmark mounted.
  *
  * A live failure is a result. Nothing here repairs, retries, or relaxes a case
  * to make one pass.
@@ -294,6 +306,9 @@ export function renderLiveSummary(report: EvalReport, path: string): string[] {
       + ` routing=${String(summary.toolRoutingPassed)}/${String(summary.toolRoutingTotal)}`
       + ` state=${String(summary.stateAssertionsPassed)}/${String(summary.stateAssertionsTotal)}`
       + ` missingFields=${String(summary.missingFieldAssertionsPassed)}/${String(summary.missingFieldAssertionsTotal)}`,
+    `image=${String(summary.imageAssertionsPassed)}/${String(summary.imageAssertionsTotal)}`
+      + ` imageMutation=${String(summary.imageMutationAssertionsPassed)}/${String(summary.imageMutationAssertionsTotal)}`
+      + ` unexpectedImageMutations=${String(summary.unexpectedImageMutations)}`,
     `toolErrors=${String(summary.toolErrors)} unexpectedMutations=${String(summary.unexpectedMutations)}`
       + ` timeouts=${String(summary.timeouts)} runtimeErrors=${String(summary.runtimeErrors)}`,
     `usage input=${String(summary.usage.inputTokens)} output=${String(summary.usage.outputTokens)}`
@@ -440,6 +455,47 @@ export function assertSingleRoute(samples: readonly LiveRouteSample[]): LiveRout
   return first.route
 }
 
+/** Whether a case attaches any image, which is what makes image capability a precondition. */
+function attachesImages(golden: GoldenCase): boolean {
+  return golden.turns.some(turn => (turn.images?.length ?? 0) > 0)
+}
+
+/**
+ * Assert the resolved route accepts image input, before a case with images runs.
+ *
+ * The harness projects every image occurrence to placeholder text for a route
+ * that declares its modalities and omits `image`, so a text-only route would not
+ * fail a vision smoke — it would quietly turn one into a text smoke whose
+ * observation assertions pass on a placeholder. That is the one degradation
+ * worth refusing outright.
+ *
+ * A route that declares no modalities is not refused: an absent declaration is
+ * "unknown", not "text only", and the request still carries the image. The check
+ * is therefore about an explicit negative, which is exactly the case the
+ * harness acts on.
+ *
+ * Exported for its own test rather than for callers — it takes a context so the
+ * check needs no real boot to exercise.
+ * @param ctx - the booted composition.
+ * @param provider - the provider route the run resolved.
+ * @param model - the model id the run resolved.
+ * @throws when the route declares modalities that exclude image input.
+ */
+export async function assertImageCapable(ctx: Context, provider: string, model: string): Promise<void> {
+  const llm = ctx.get('llm')
+  /* v8 ignore next -- boot() awaited the Loader, and every medical composition mounts the LLM service */
+  if (llm === undefined) {
+    throw new Error(`${LIVE_PROFILE}: the booted composition published no LLM service, so a route cannot be resolved`)
+  }
+  const modalities = (await llm.resolveModelInfo(provider, model)).inputModalities
+  if (modalities === undefined || modalities.includes('image')) return
+  throw new Error(
+    `${LIVE_PROFILE}: the image case needs a route that accepts image input, but ${provider}/${model} declares`
+    + ` ${modalities.join(', ')}. A run against it would project every image to placeholder text, so it would`
+    + ' measure a text smoke while reporting a vision one.',
+  )
+}
+
 /**
  * Boot one case's runtime and create its agent.
  *
@@ -482,6 +538,7 @@ async function bootCase(
   // the run.
   /* v8 ignore next -- route-absent is the live path, exercised by a real smoke */
   const selection = options.route ?? defaultModel.currentSelection()
+  if (attachesImages(golden)) await assertImageCapable(ctx, selection.provider, selection.model)
   const agentOptions = { provider: selection.provider, model: selection.model }
   const setup = (agentCtx: Context): void => {
     const selected: ModelSelectionRef = { current: selection, assembled: undefined }

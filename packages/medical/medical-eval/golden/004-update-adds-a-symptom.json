@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "update-adds-a-symptom",
   "description": "A newly mentioned symptom is appended to the recorded list, which keeps every symptom the case already held.",
   "turns": [

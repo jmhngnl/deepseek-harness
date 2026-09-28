@@ -10,13 +10,18 @@
  * one of them is evidence.
  */
 
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { LlmError, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
+import { LlmError, ToolCallId, visitImageBlocks } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, ImageBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
+import MedicalImageService from '@deepseek-ai/dsh-medical-image'
 import { loadGoldenCases, runGoldenCases } from '../src/index.ts'
 import type { GoldenCase, GoldenCaseHarness } from '../src/index.ts'
 import { MedicalCaseService } from '@deepseek-ai/dsh-medical-case'
@@ -24,6 +29,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import * as ToolMedicalCaseGet from '@deepseek-ai/dsh-tool-medical-case-get'
 import * as ToolMedicalCaseIntake from '@deepseek-ai/dsh-tool-medical-case-intake'
 import * as ToolMedicalCaseUpdate from '@deepseek-ai/dsh-tool-medical-case-update'
+import * as ToolMedicalImageGet from '@deepseek-ai/dsh-tool-medical-image-get'
+import * as ToolMedicalImageObserve from '@deepseek-ai/dsh-tool-medical-image-observe'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 /** The directory the shipped roster lives in. */
@@ -32,8 +39,21 @@ const ROSTER = fileURLToPath(new URL('../golden/', import.meta.url))
 /** Provider route every scripted adapter is registered under. */
 const PROVIDER = 'mock'
 
+/**
+ * Harness homes this suite created, removed when it ends.
+ *
+ * The attachment service is given its own root per case rather than the real
+ * `$DSH_HOME`, so a deterministic run cannot write into a user's attachment
+ * store and cannot inherit one either.
+ */
+const HARNESS_HOMES: string[] = []
+
+afterAll(() => {
+  for (const home of HARNESS_HOMES.splice(0)) rmSync(home, { recursive: true, force: true })
+})
+
 /** A scripted model call, or a marker that the turn never settles. */
-type ScriptEntry = StreamChunk[] | 'hang' | (() => never)
+type ScriptEntry = StreamChunk[] | 'hang' | (() => never) | ((options: GenerateOptions) => StreamChunk[])
 
 /** One case's runtime as the runner receives it. */
 interface Built {
@@ -44,17 +64,62 @@ interface Built {
 /** Mount the shipped services and one scripted model under a context of this case's own. */
 async function build(caseId: string, script: ScriptEntry[]): Promise<Built> {
   const ctx = new Context()
+  const home = mkdtempSync(join(tmpdir(), 'medharness-eval-'))
+  HARNESS_HOMES.push(home)
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(MedicalCaseService)
+  await ctx.plugin(MedicalImageService)
+  await ctx.plugin(LocalAttachmentStore, { dshHome: home })
   await ctx.plugin(ToolMedicalCaseIntake)
   await ctx.plugin(ToolMedicalCaseUpdate)
   await ctx.plugin(ToolMedicalCaseGet)
+  await ctx.plugin(ToolMedicalImageObserve)
+  await ctx.plugin(ToolMedicalImageGet)
   // The adapter consumes the script it is handed, so each case gets its own copy.
   const adapter = new MockAdapter([...script])
   ctx.llm.registerAdapter([PROVIDER], adapter)
   const agent = await ctx.agentLoop.create(SessionId(`golden-${caseId}`), { provider: PROVIDER, model: 'mock' })
   return { harness: { ctx, agent }, adapter }
+}
+
+/**
+ * The attachment ids a request carries, in message order.
+ *
+ * This is what a model reads beside each image: the harness puts the canonical
+ * id in the request, and a scripted turn has to answer with the same id. Nothing
+ * here computes a digest — the ids come from admission, through the request.
+ */
+function requestImageIds(options: GenerateOptions): string[] {
+  const ids: string[] = []
+  for (const message of options.messages) {
+    visitImageBlocks(message.content, (block) => { ids.push(String(block.attachment.attachmentId)) })
+  }
+  return ids
+}
+
+/** One COMPLETE observation snapshot, as the tool requires it. */
+function snapshot(fields: Record<string, unknown> = {}): Record<string, unknown> {
+  return { bodyRegion: null, findings: [], usable: true, qualityIssues: [], uncertainty: [], ...fields }
+}
+
+/** A model call that observes the image at one position in the request. */
+function observeImage(
+  position: number,
+  fields: Record<string, unknown>,
+  callId: string,
+): (options: GenerateOptions) => StreamChunk[] {
+  return options => toolCallResponse(callId, 'medical_image_observe', {
+    attachmentId: requestImageIds(options)[position],
+    ...snapshot(fields),
+  })
+}
+
+/** A model call that reads back the image at one position in the request. */
+function getImage(position: number, callId: string): (options: GenerateOptions) => StreamChunk[] {
+  return options => toolCallResponse(callId, 'medical_image_get', {
+    attachmentId: requestImageIds(options)[position],
+  })
 }
 
 /** One shipped case, which the roster is expected to hold. */
@@ -141,6 +206,54 @@ const SCRIPTS: Record<string, ScriptEntry[]> = {
     toolCallResponse('c2', 'medical_case_intake', { symptoms: ['头疼', '发烧'], age: 25 }),
     textResponse('记录未变。'),
   ],
+  // ── The image cases ──────────────────────────────────────────────────────
+  //
+  // Every image turn answers with the attachment id the REQUEST carried, which
+  // is what a real model does: it reads the id beside the image. No script
+  // computes a digest, and none could — admission mints it.
+  'image-observe-single-usable': [
+    observeImage(0, { bodyRegion: 'forearm', findings: ['red patch'] }, 'c1'),
+    textResponse('已记录观察到的情况。'),
+  ],
+  'image-observe-unusable-image': [
+    observeImage(0, {
+      usable: false,
+      findings: [],
+      qualityIssues: ['blur', 'poor_lighting'],
+      uncertainty: ['no resolvable structure'],
+    }, 'c1'),
+    textResponse('这张照片看不清，能再拍一张吗？'),
+  ],
+  'image-observe-restatement-is-a-noop': [
+    observeImage(0, { bodyRegion: 'forearm', findings: ['red patch'] }, 'c1'),
+    textResponse('已记录。'),
+    // The identical full snapshot, submitted again.
+    observeImage(0, { bodyRegion: 'forearm', findings: ['red patch'] }, 'c2'),
+    textResponse('已复核，记录未变。'),
+  ],
+  'image-observe-update-advances-revision': [
+    observeImage(0, { findings: ['red patch'] }, 'c1'),
+    textResponse('已记录。'),
+    observeImage(0, { findings: ['red patch', 'scaling at the border'] }, 'c2'),
+    textResponse('已更新。'),
+  ],
+  'image-observe-two-images': [
+    observeImage(0, { findings: ['red patch'] }, 'c1'),
+    observeImage(1, { findings: ['blue square'] }, 'c2'),
+    textResponse('两张都记下了。'),
+    getImage(1, 'c3'),
+    textResponse('第二张还在记录里。'),
+  ],
+  'image-observe-keeps-the-case-untouched': [
+    toolCallResponse('c1', 'medical_case_intake', { symptoms: ['头疼', '发烧'], duration: '两天', age: 25 }),
+    textResponse('已记录。'),
+    observeImage(0, { findings: ['red patch'] }, 'c2'),
+    textResponse('图片观察也已记录。'),
+  ],
+  'image-live-smoke-visible-patch': [
+    observeImage(0, { bodyRegion: 'forearm', findings: ['red disc on a light background'] }, 'c1'),
+    textResponse('已记录观察到的情况。'),
+  ],
 }
 
 /** Replay the shipped roster, capturing each case's adapter and session. */
@@ -170,27 +283,33 @@ describe('replaying the shipped roster', () => {
       `${run.evaluation.id} turn ${String(failure.turnIndex)}: ${failure.failureType} — ${failure.detail}`))
 
     expect(reported).toEqual([])
-    expect(runs).toHaveLength(8)
+    expect(runs).toHaveLength(15)
     expect(runs.every(run => run.evaluation.passed)).toBe(true)
   })
 
-  it('gives every case a session and a case identity of its own', async () => {
+  it('gives every case a session, and every recorded case an identity, of its own', async () => {
     const { runs, sessions } = await replayRoster()
 
-    expect(new Set(sessions).size).toBe(8)
-    const identities = runs.map(run => run.evaluation.turns.at(-1)?.caseState?.caseId)
-    expect(identities.every(identity => identity !== undefined)).toBe(true)
-    expect(new Set(identities).size).toBe(8)
+    expect(new Set(sessions).size).toBe(runs.length)
+    // An image-only case records no case, so only the cases that opened one
+    // have an identity to compare — and no two of those may share it.
+    const identities = runs
+      .map(run => run.evaluation.turns.at(-1)?.caseState?.caseId)
+      .filter(identity => identity !== undefined)
+    expect(identities.length).toBeGreaterThan(0)
+    expect(new Set(identities).size).toBe(identities.length)
   })
 
   it('asks the model for exactly the calls each case scripts', async () => {
     const { runs, adapters } = await replayRoster()
 
     for (const run of runs) {
-      // Two calls per turn: the tool call the case is about, then the text that
-      // ends the turn. More would mean the loop needed a second step.
-      expect(adapters.get(run.evaluation.id)?.requests, run.evaluation.id)
-        .toHaveLength(run.golden.turns.length * 2)
+      // One model call per tool call the case scripts, plus the text that ends
+      // the turn. More would mean the loop needed a step the case did not
+      // anticipate.
+      const expected = run.golden.turns
+        .reduce((total, turn) => total + turn.expect.toolRouting.calls.length + 1, 0)
+      expect(adapters.get(run.evaluation.id)?.requests, run.evaluation.id).toHaveLength(expected)
     }
   })
 
@@ -322,5 +441,157 @@ describe('a route that measures nothing', () => {
 
     expect(runs[0]?.evaluation.passed).toBe(true)
     expect(runs[0]?.evaluation.turns[0]?.usage).toBeNull()
+  })
+})
+
+// ── The image path ─────────────────────────────────────────────────────────
+
+/** The image blocks one request carried, in message order. */
+function requestImageBlocks(options: GenerateOptions): ImageBlock[] {
+  const blocks: ImageBlock[] = []
+  for (const message of options.messages) {
+    visitImageBlocks(message.content, (block) => { blocks.push(block) })
+  }
+  return blocks
+}
+
+/** One image case's runtime and the adapter that served it. */
+async function replayOne(id: string, script: ScriptEntry[]): Promise<{
+  run: Awaited<ReturnType<typeof runGoldenCases>>[number]
+  adapter: MockAdapter
+}> {
+  let adapter: MockAdapter | undefined
+  const runs = await runGoldenCases([rosterCase(id)], async () => {
+    const built = await build(id, script)
+    adapter = built.adapter
+    return built.harness
+  })
+  const [run] = runs
+  if (run === undefined || adapter === undefined) throw new Error(`replaying ${id} produced no run`)
+  return { run, adapter }
+}
+
+describe('the image a golden case attaches', () => {
+  it('reaches the model as a real ImageBlock carrying an admitted reference', async () => {
+    const { adapter } = await replayOne('image-observe-single-usable', SCRIPTS['image-observe-single-usable'] ?? [])
+
+    const [block] = requestImageBlocks(adapter.requests[0] as GenerateOptions)
+    expect(block?.type).toBe('image')
+    // The reference is admission's, not this suite's: a digest, a media type, and
+    // intrinsic dimensions the fixture really has.
+    expect(String(block?.attachment.attachmentId)).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(block?.attachment.mediaType).toBe('image/png')
+    expect(block?.attachment.width).toBe(64)
+    expect(block?.attachment.height).toBe(64)
+    expect(block?.attachment.bytes).toBeGreaterThan(0)
+  })
+
+  it('carries the image and the text in ONE user message', async () => {
+    const { adapter } = await replayOne('image-observe-single-usable', SCRIPTS['image-observe-single-usable'] ?? [])
+
+    const carrying = (adapter.requests[0] as GenerateOptions).messages
+      .filter(message => message.content.some(block => block.type === 'image'))
+    expect(carrying).toHaveLength(1)
+    expect(carrying[0]?.role).toBe('user')
+    expect(carrying[0]?.content[0]).toEqual({ type: 'text', text: '我拍了一张照片，你看看' })
+  })
+
+  it('resolves the golden image key to the attachment admission minted', async () => {
+    const { run, adapter } = await replayOne(
+      'image-observe-restatement-is-a-noop',
+      SCRIPTS['image-observe-restatement-is-a-noop'] ?? [],
+    )
+
+    const [requested] = requestImageBlocks(adapter.requests[0] as GenerateOptions)
+    for (const turn of run.evaluation.turns) {
+      const [stored] = turn.imageObservations
+      expect(stored?.imageKey).toBe('image-1')
+      expect(stored?.attachmentId).toBe(String(requested?.attachment.attachmentId))
+    }
+  })
+
+  it('keeps two images apart, in the order the case named them', async () => {
+    const { run, adapter } = await replayOne('image-observe-two-images', SCRIPTS['image-observe-two-images'] ?? [])
+
+    const requested = requestImageBlocks(adapter.requests[0] as GenerateOptions)
+    expect(requested).toHaveLength(2)
+    const [first, second] = requested
+    expect(String(first?.attachment.attachmentId)).not.toBe(String(second?.attachment.attachmentId))
+
+    const stored = run.evaluation.turns[0]?.imageObservations ?? []
+    expect(stored.map(observation => observation.imageKey)).toEqual(['image-1', 'image-2'])
+    expect(stored.map(observation => observation.attachmentId)).toEqual([
+      String(first?.attachment.attachmentId),
+      String(second?.attachment.attachmentId),
+    ])
+    // The second image is not lost behind the first: a single-slot store would
+    // have replaced it, and this is the case that says so.
+    expect(stored[1]?.findings).toEqual(['blue square'])
+  })
+
+  it('reads back the image the read call addressed', async () => {
+    const { run } = await replayOne('image-observe-two-images', SCRIPTS['image-observe-two-images'] ?? [])
+
+    // The case's second turn calls `medical_image_get` with the SECOND image's
+    // id, and the turn leaves both observations standing.
+    expect(run.evaluation.turns[1]?.toolCalls).toEqual(['medical_image_get'])
+    expect(run.evaluation.turns[1]?.imageObservations.map(observation => observation.imageKey))
+      .toEqual(['image-1', 'image-2'])
+    expect(run.evaluation.passed).toBe(true)
+  })
+
+  it('records the image events with the session sequences that evidence them', async () => {
+    const { run } = await replayOne('image-observe-single-usable', SCRIPTS['image-observe-single-usable'] ?? [])
+
+    const [failureFree] = run.evaluation.turns[0]?.results ?? []
+    expect(failureFree?.evidence.imageEventSeqs).toHaveLength(1)
+  })
+
+  it('appends no case record when a turn only observes an image', async () => {
+    const { run } = await replayOne(
+      'image-observe-keeps-the-case-untouched',
+      SCRIPTS['image-observe-keeps-the-case-untouched'] ?? [],
+    )
+
+    const [before, after] = run.evaluation.turns
+    expect(after?.caseState).toEqual(before?.caseState)
+    expect(after?.caseState?.revision).toBe(1)
+    expect(after?.imageObservations).toHaveLength(1)
+    expect(run.evaluation.passed).toBe(true)
+  })
+
+  it('refuses a case with images when the harness mounts no attachment service', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(MedicalCaseService)
+    const agent = await ctx.agentLoop.create(SessionId('no-attachments'), { provider: PROVIDER, model: 'mock' })
+
+    await expect(runGoldenCases(
+      [rosterCase('image-observe-single-usable')],
+      () => ({ ctx, agent }),
+    )).rejects.toThrow(/mounts no attachment service/)
+
+    await ctx.fiber.dispose()
+  })
+
+  it('runs a text-only case on a harness that mounts no image domain', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(MedicalCaseService)
+    await ctx.plugin(ToolMedicalCaseIntake)
+    await ctx.plugin(ToolMedicalCaseUpdate)
+    await ctx.plugin(ToolMedicalCaseGet)
+    const adapter = new MockAdapter([...(SCRIPTS['intake-complete-first-contact'] ?? [])])
+    ctx.llm.registerAdapter([PROVIDER], adapter)
+    const agent = await ctx.agentLoop.create(SessionId('text-only'), { provider: PROVIDER, model: 'mock' })
+
+    // A composition without the image domain is a legitimate text-only runtime,
+    // so the runner reports no image rather than failing the case.
+    const runs = await runGoldenCases([rosterCase('intake-complete-first-contact')], () => ({ ctx, agent }))
+
+    expect(runs[0]?.evaluation.passed).toBe(true)
+    expect(runs[0]?.evaluation.turns[0]?.imageObservations).toEqual([])
   })
 })

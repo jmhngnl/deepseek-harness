@@ -20,6 +20,7 @@ import type {
   FailureType,
   GoldenCase,
   GoldenCaseRun,
+  ObservedImageObservation,
   TurnEvaluation,
 } from '../src/index.ts'
 
@@ -38,18 +39,38 @@ function result(kind: AssertionKind, failureType: FailureType | null): Evaluatio
     detail: `${kind} ${failureType ?? 'passed'}`,
     expected: 'expected',
     actual: failureType === null ? 'expected' : 'actual',
-    evidence: { toolCallSeqs: [], toolResultSeqs: [], caseEventSeqs: [] },
+    evidence: { toolCallSeqs: [], toolResultSeqs: [], caseEventSeqs: [], imageEventSeqs: [] },
+  }
+}
+
+/** One authoritative image observation, as a report would present it. */
+function imageObservation(): ObservedImageObservation {
+  return {
+    imageKey: 'image-1',
+    attachmentId: `sha256:${'a'.repeat(64)}`,
+    revision: 1,
+    bodyRegion: 'forearm',
+    findings: ['red patch'],
+    usable: true,
+    qualityIssues: ['blur'],
+    uncertainty: ['depth unclear'],
   }
 }
 
 /** One evaluated turn. */
-function turn(index: number, results: EvaluationResult[], usage: TokenUsage | null = null): TurnEvaluation {
+function turn(
+  index: number,
+  results: EvaluationResult[],
+  usage: TokenUsage | null = null,
+  imageObservations: readonly ObservedImageObservation[] = [],
+): TurnEvaluation {
   return {
     turnIndex: index,
     passed: results.every(entry => entry.failureType === null),
     results,
     toolCalls: [],
     caseState: null,
+    imageObservations,
     usage,
   }
 }
@@ -57,7 +78,7 @@ function turn(index: number, results: EvaluationResult[], usage: TokenUsage | nu
 /** The golden case a synthetic run reports against. */
 function golden(id: string): GoldenCase {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     description: 'A synthetic case used to pin report aggregation.',
     turns: [{ user: '提问', expect: { toolRouting: { kind: 'exact', calls: [] } } }],
@@ -133,6 +154,11 @@ describe('summarizing a run', () => {
       stateAssertionsTotal: 3,
       missingFieldAssertionsPassed: 1,
       missingFieldAssertionsTotal: 2,
+      imageAssertionsPassed: 0,
+      imageAssertionsTotal: 0,
+      imageMutationAssertionsPassed: 0,
+      imageMutationAssertionsTotal: 0,
+      unexpectedImageMutations: 0,
       toolErrors: 1,
       unexpectedMutations: 1,
       timeouts: 1,
@@ -174,6 +200,11 @@ describe('summarizing a run', () => {
       stateAssertionsTotal: 0,
       missingFieldAssertionsPassed: 0,
       missingFieldAssertionsTotal: 0,
+      imageAssertionsPassed: 0,
+      imageAssertionsTotal: 0,
+      imageMutationAssertionsPassed: 0,
+      imageMutationAssertionsTotal: 0,
+      unexpectedImageMutations: 0,
       toolErrors: 0,
       unexpectedMutations: 0,
       timeouts: 0,
@@ -195,7 +226,7 @@ describe('a report document', () => {
       runs: [failingRun()],
     })
 
-    expect(report.schemaVersion).toBe(1)
+    expect(report.schemaVersion).toBe(2)
     expect(report.runId).toBe('run-1')
     expect(report.runtime).toEqual(RUNTIME)
     expect(report.cases.map(entry => entry.id)).toEqual(['failing'])
@@ -221,8 +252,8 @@ describe('a report document', () => {
       'RUNTIME_ERROR',
     ])
     expect(presented?.turns).toEqual([
-      { turnIndex: 0, toolCalls: [], caseState: null },
-      { turnIndex: 1, toolCalls: [], caseState: null },
+      { turnIndex: 0, toolCalls: [], caseState: null, imageObservations: [] },
+      { turnIndex: 1, toolCalls: [], caseState: null, imageObservations: [] },
     ])
     expect(JSON.stringify(report)).not.toContain('提问')
   })
@@ -252,5 +283,69 @@ describe('where a report lives', () => {
 
     expect(path).toBe(join(directory, 'run-1.json'))
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(report)
+  })
+})
+
+describe('the image dimension of a report', () => {
+  it('carries the authoritative observations a turn produced', () => {
+    const report = buildReport({
+      runId: 'run-images',
+      startedAt: '2026-09-24T06:00:00.000Z',
+      finishedAt: '2026-09-24T06:00:01.000Z',
+      runtime: RUNTIME,
+      runs: [run('image-case', [turn(0, [result('imageState', null)], null, [imageObservation()])], 10)],
+    })
+
+    expect(report.cases[0]?.turns[0]?.imageObservations).toEqual([imageObservation()])
+  })
+
+  it('counts the image dimensions on their own', () => {
+    const report = buildReport({
+      runId: 'run-image-counts',
+      startedAt: '2026-09-24T06:00:00.000Z',
+      finishedAt: '2026-09-24T06:00:01.000Z',
+      runtime: RUNTIME,
+      runs: [run('image-case', [
+        turn(0, [
+          result('imageState', null),
+          result('imageState', 'IMAGE_OBSERVATION_MISMATCH'),
+          result('imageMutation', null),
+          result('imageMutation', 'UNEXPECTED_IMAGE_MUTATION'),
+        ]),
+      ], 10)],
+    })
+
+    expect(report.summary.imageAssertionsPassed).toBe(1)
+    expect(report.summary.imageAssertionsTotal).toBe(2)
+    expect(report.summary.imageMutationAssertionsPassed).toBe(1)
+    expect(report.summary.imageMutationAssertionsTotal).toBe(2)
+    expect(report.summary.unexpectedImageMutations).toBe(1)
+    // The image dimension never leaks into the case dimensions.
+    expect(report.summary.stateAssertionsTotal).toBe(0)
+    expect(report.summary.unexpectedMutations).toBe(0)
+  })
+
+  it('carries no image bytes, base64, or filesystem path', () => {
+    const report = buildReport({
+      runId: 'run-no-bytes',
+      startedAt: '2026-09-24T06:00:00.000Z',
+      finishedAt: '2026-09-24T06:00:01.000Z',
+      runtime: RUNTIME,
+      runs: [run('image-case', [turn(0, [result('imageState', null)], null, [imageObservation()])], 10)],
+    })
+
+    const serialized = JSON.stringify(report)
+    // The observation's own fields survive; nothing that could carry an image
+    // does.
+    expect(serialized).toContain('"imageKey":"image-1"')
+    expect(serialized).toContain('"findings":["red patch"]')
+    expect(serialized).not.toContain('data:image')
+    expect(serialized).not.toContain('base64')
+    expect(serialized).not.toContain('.png')
+    expect(serialized).not.toMatch(/[A-Za-z]:\\/)
+    expect(serialized).not.toContain('/fixtures/')
+    expect(Object.keys(report.cases[0]?.turns[0]?.imageObservations[0] ?? {}).sort()).toEqual([
+      'attachmentId', 'bodyRegion', 'findings', 'imageKey', 'qualityIssues', 'revision', 'uncertainty', 'usable',
+    ])
   })
 })

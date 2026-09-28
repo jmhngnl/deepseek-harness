@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "update-removes-a-corrected-symptom",
   "description": "Correcting an earlier statement removes exactly the symptom the user retracted: a correction that would empty the list is rejected by the domain rather than recorded as an erasure.",
   "turns": [

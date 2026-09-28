@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "id": "image-live-smoke-visible-patch",
+  "description": "The one image case a real model is asked to pass: a single unmistakable synthetic subject on a plain field. It pins what a live observer can reliably produce — the observation exists for the right image at revision one, is usable, and records at least one finding — and deliberately does not pin the sentence the model writes.",
+  "turns": [
+    {
+      "user": "请看一下我拍的这张照片，把你直接看到的内容记录下来",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "usable": true,
+            "minimumFindings": 1
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    }
+  ]
+}

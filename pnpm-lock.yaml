@@ -8317,12 +8317,21 @@ importers:
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:^
         version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@deepseek-ai/dsh-attachment-local':
+        specifier: workspace:^
+        version: link:../../attachment/attachment-local
       '@deepseek-ai/dsh-llm':
         specifier: workspace:^
         version: link:../../llm/llm
       '@deepseek-ai/dsh-medical-case':
         specifier: workspace:^
         version: link:../medical-case
+      '@deepseek-ai/dsh-medical-image':
+        specifier: workspace:^
+        version: link:../medical-image
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -8341,6 +8350,12 @@ importers:
       '@deepseek-ai/dsh-tool-medical-case-update':
         specifier: workspace:^
         version: link:../tool-medical-case-update
+      '@deepseek-ai/dsh-tool-medical-image-get':
+        specifier: workspace:^
+        version: link:../tool-medical-image-get
+      '@deepseek-ai/dsh-tool-medical-image-observe':
+        specifier: workspace:^
+        version: link:../tool-medical-image-observe
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools

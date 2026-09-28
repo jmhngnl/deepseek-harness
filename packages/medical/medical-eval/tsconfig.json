@@ -33,7 +33,13 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../attachment/attachment"
+    },
+    {
       "path": "../medical-case"
+    },
+    {
+      "path": "../medical-image"
     }
   ]
 }

@@ -15,13 +15,19 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { CaseOperation, MissingField } from '@deepseek-ai/dsh-medical-case'
+import type { ImageObservationOperation, ImageQualityIssue } from '@deepseek-ai/dsh-medical-image'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import { fixtureIds } from './fixtures.ts'
 import { GOLDEN_CASE_SCHEMA_VERSION, GoldenCaseError, isJson } from './runtime.ts'
 import type {
   CaseStateExpectation,
   ExpectedToolCall,
   GoldenCase,
+  GoldenImageInput,
   GoldenTurn,
+  ImageMutationEventExpectation,
+  ImageMutationExpectation,
+  ImageObservationExpectation,
   MutationExpectation,
   ToolRoutingExpectation,
   TurnExpectation,
@@ -52,12 +58,33 @@ function readDocument(path: string): unknown {
 
 /** Members each object of the contract admits, so a typo cannot read as absence. */
 const CASE_KEYS = ['schemaVersion', 'id', 'description', 'turns']
-const TURN_KEYS = ['user', 'expect']
-const EXPECT_KEYS = ['toolRouting', 'caseState', 'mutation']
+const TURN_KEYS = ['user', 'images', 'expect']
+const EXPECT_KEYS = ['toolRouting', 'caseState', 'mutation', 'imageObservations', 'imageMutation']
 const ROUTING_KEYS = ['kind', 'calls']
 const CALL_KEYS = ['name', 'arguments']
 const CASE_STATE_KEYS = ['symptoms', 'duration', 'age', 'additionalNotes', 'revision', 'missingFields']
 const MUTATION_KEYS = ['changed', 'eventCountDelta', 'operations']
+const IMAGE_INPUT_KEYS = ['key', 'fixture']
+const IMAGE_OBSERVATION_KEYS = [
+  'imageKey', 'bodyRegion', 'findings', 'minimumFindings', 'usable', 'qualityIssues', 'uncertainty', 'revision',
+]
+const IMAGE_MUTATION_KEYS = ['changed', 'eventCountDelta', 'events']
+const IMAGE_MUTATION_EVENT_KEYS = ['imageKey', 'operation', 'revision']
+
+/** Durable image verbs an expectation may name, as a lookup rather than a narrowing cast. */
+const IMAGE_OPERATIONS: Readonly<Record<string, ImageObservationOperation | undefined>> = {
+  observe: 'observe',
+  update: 'update',
+}
+
+/** Quality limitations an expectation may name, as a lookup rather than a narrowing cast. */
+const QUALITY_ISSUES: Readonly<Record<string, ImageQualityIssue | undefined>> = {
+  blur: 'blur',
+  poor_lighting: 'poor_lighting',
+  occlusion: 'occlusion',
+  too_distant: 'too_distant',
+  unable_to_assess: 'unable_to_assess',
+}
 
 /** Durable verbs an expectation may name, as a lookup rather than a narrowing cast. */
 const OPERATIONS: Readonly<Record<string, CaseOperation | undefined>> = {
@@ -90,6 +117,7 @@ export function parseGoldenCase(value: unknown, source: string): GoldenCase {
   const turns = asArray(document['turns'], `${source}.turns`)
     .map((turn, index) => parseGoldenTurn(turn, `${source}.turns[${String(index)}]`))
   if (turns.length === 0) throw new GoldenCaseError(`${source}.turns must hold at least one turn`)
+  assertImageKeys(turns, source)
   return {
     schemaVersion: GOLDEN_CASE_SCHEMA_VERSION,
     id: asText(document['id'], `${source}.id`),
@@ -98,14 +126,77 @@ export function parseGoldenCase(value: unknown, source: string): GoldenCase {
   }
 }
 
+/**
+ * Assert the image keys a case uses are unambiguous.
+ *
+ * Two rules, both about what a key means. A key is unique inside one turn,
+ * because one message cannot carry the same logical image twice and still have
+ * the runner resolve it. And a key names ONE fixture for the whole case, because
+ * an expectation refers to the key alone: a key that meant one image in turn one
+ * and another in turn two would make every expectation written against it
+ * meaningless.
+ *
+ * The same fixture under two keys is allowed, and so is one key across several
+ * turns — that is how a case says "the same image, looked at again".
+ */
+function assertImageKeys(turns: readonly GoldenTurn[], source: string): void {
+  const fixtureByKey = new Map<string, string>()
+  for (const [turnIndex, turn] of turns.entries()) {
+    const path = `${source}.turns[${String(turnIndex)}].images`
+    const seenHere = new Set<string>()
+    for (const [imageIndex, image] of (turn.images ?? []).entries()) {
+      if (seenHere.has(image.key)) {
+        throw new GoldenCaseError(`${path}[${String(imageIndex)}].key ${JSON.stringify(image.key)} is used twice in this turn`)
+      }
+      seenHere.add(image.key)
+      const named = fixtureByKey.get(image.key)
+      if (named === undefined) {
+        fixtureByKey.set(image.key, image.fixture)
+        continue
+      }
+      if (named !== image.fixture) {
+        throw new GoldenCaseError(
+          `${path}[${String(imageIndex)}].key ${JSON.stringify(image.key)} names fixture ${JSON.stringify(image.fixture)},`
+          + ` but an earlier turn named ${JSON.stringify(named)} for the same key`,
+        )
+      }
+    }
+  }
+}
+
 /** Read one turn of a golden case. */
 function parseGoldenTurn(value: unknown, path: string): GoldenTurn {
   const turn = asRecord(value, path)
   rejectUnknownKeys(turn, TURN_KEYS, path)
-  return {
+  const images = optionalMember(turn, 'images', path, parseImageInputs)
+  const parsed: { user: string; images?: readonly GoldenImageInput[]; expect: TurnExpectation } = {
     user: asText(turn['user'], `${path}.user`),
     expect: parseTurnExpectation(turn['expect'], `${path}.expect`),
   }
+  if (images !== undefined) parsed.images = images
+  return parsed
+}
+
+/** Read the synthetic images one turn attaches, in message order. */
+function parseImageInputs(value: unknown, path: string): GoldenImageInput[] {
+  const images = asArray(value, path)
+  if (images.length === 0) throw new GoldenCaseError(`${path} must name at least one image; omit the member for a text-only turn`)
+  return images.map((image, index) => {
+    const at = `${path}[${String(index)}]`
+    const input = asRecord(image, at)
+    rejectUnknownKeys(input, IMAGE_INPUT_KEYS, at)
+    const fixture = asText(input['fixture'], `${at}.fixture`)
+    // The registry is the only authority on what a fixture id may be, so an id
+    // it does not hold fails here rather than at replay time — and a case can
+    // never name a file the package does not own.
+    if (!fixtureIds().includes(fixture)) {
+      throw new GoldenCaseError(
+        `${at}.fixture ${JSON.stringify(fixture)} is not a registered fixture;`
+        + ` the registry holds ${fixtureIds().join(', ')}`,
+      )
+    }
+    return { key: asText(input['key'], `${at}.key`), fixture }
+  })
 }
 
 /** Read what one turn is measured against. */
@@ -114,14 +205,124 @@ function parseTurnExpectation(value: unknown, path: string): TurnExpectation {
   rejectUnknownKeys(expectation, EXPECT_KEYS, path)
   const caseState = optionalMember(expectation, 'caseState', path, parseCaseStateExpectation)
   const mutation = optionalMember(expectation, 'mutation', path, parseMutationExpectation)
+  const imageObservations = optionalMember(expectation, 'imageObservations', path, parseImageObservations)
+  const imageMutation = optionalMember(expectation, 'imageMutation', path, parseImageMutationExpectation)
   const parsed: {
     toolRouting: ToolRoutingExpectation
     caseState?: CaseStateExpectation
     mutation?: MutationExpectation
+    imageObservations?: readonly ImageObservationExpectation[]
+    imageMutation?: ImageMutationExpectation
   } = { toolRouting: parseToolRouting(expectation['toolRouting'], `${path}.toolRouting`) }
   if (caseState !== undefined) parsed.caseState = caseState
   if (mutation !== undefined) parsed.mutation = mutation
+  if (imageObservations !== undefined) parsed.imageObservations = imageObservations
+  if (imageMutation !== undefined) parsed.imageMutation = imageMutation
   return parsed
+}
+
+/** Read the authoritative image observations one turn must produce. */
+function parseImageObservations(value: unknown, path: string): ImageObservationExpectation[] {
+  const entries = asArray(value, path)
+  if (entries.length === 0) throw new GoldenCaseError(`${path} must name at least one image; omit the member when the turn asserts none`)
+  const parsed = entries.map((entry, index) => parseImageObservation(entry, `${path}[${String(index)}]`))
+  const keys = parsed.map(entry => entry.imageKey)
+  if (new Set(keys).size !== keys.length) {
+    throw new GoldenCaseError(`${path} must not name the same imageKey twice`)
+  }
+  return parsed
+}
+
+/** Read the fields of one authoritative image observation an expectation pins. */
+function parseImageObservation(value: unknown, path: string): ImageObservationExpectation {
+  const expectation = asRecord(value, path)
+  rejectUnknownKeys(expectation, IMAGE_OBSERVATION_KEYS, path)
+  const findings = optionalMember(expectation, 'findings', path, asTextArray)
+  const minimumFindings = optionalMember(expectation, 'minimumFindings', path, asWholeNumber)
+  // Mutually exclusive on purpose: an exact list and a lower bound are two
+  // different assertions, and accepting both would leave the evaluator choosing
+  // which one the author meant.
+  if (findings !== undefined && minimumFindings !== undefined) {
+    throw new GoldenCaseError(`${path} must not carry both findings and minimumFindings`)
+  }
+  const parsed: {
+    imageKey: string
+    bodyRegion?: string | null
+    findings?: readonly string[]
+    minimumFindings?: number
+    usable?: boolean
+    qualityIssues?: readonly ImageQualityIssue[]
+    uncertainty?: readonly string[]
+    revision?: number
+  } = { imageKey: asText(expectation['imageKey'], `${path}.imageKey`) }
+  const bodyRegion = optionalMember(expectation, 'bodyRegion', path, asNullableText)
+  const usable = optionalMember(expectation, 'usable', path, asBoolean)
+  const qualityIssues = optionalMember(expectation, 'qualityIssues', path, asQualityIssueArray)
+  const uncertainty = optionalMember(expectation, 'uncertainty', path, asTextArray)
+  const revision = optionalMember(expectation, 'revision', path, asRevision)
+  if (bodyRegion !== undefined) parsed.bodyRegion = bodyRegion
+  if (findings !== undefined) parsed.findings = findings
+  if (minimumFindings !== undefined) parsed.minimumFindings = minimumFindings
+  if (usable !== undefined) parsed.usable = usable
+  if (qualityIssues !== undefined) parsed.qualityIssues = qualityIssues
+  if (uncertainty !== undefined) parsed.uncertainty = uncertainty
+  if (revision !== undefined) parsed.revision = revision
+  return parsed
+}
+
+/** Read what one turn must do to the durable image-observation records. */
+function parseImageMutationExpectation(value: unknown, path: string): ImageMutationExpectation {
+  const expectation = asRecord(value, path)
+  rejectUnknownKeys(expectation, IMAGE_MUTATION_KEYS, path)
+  const parsed: {
+    changed?: boolean
+    eventCountDelta?: number
+    events?: readonly ImageMutationEventExpectation[]
+  } = {}
+  const changed = optionalMember(expectation, 'changed', path, asBoolean)
+  const eventCountDelta = optionalMember(expectation, 'eventCountDelta', path, asWholeNumber)
+  const events = optionalMember(expectation, 'events', path, asImageMutationEventArray)
+  if (changed !== undefined) parsed.changed = changed
+  if (eventCountDelta !== undefined) parsed.eventCountDelta = eventCountDelta
+  if (events !== undefined) parsed.events = events
+  return parsed
+}
+
+/** Read the durable image records an expectation pins, in order. */
+function asImageMutationEventArray(value: unknown, path: string): ImageMutationEventExpectation[] {
+  return asArray(value, path).map((entry, index) => {
+    const at = `${path}[${String(index)}]`
+    const event = asRecord(entry, at)
+    rejectUnknownKeys(event, IMAGE_MUTATION_EVENT_KEYS, at)
+    const revision = optionalMember(event, 'revision', at, asRevision)
+    const parsed: { imageKey: string; operation: ImageObservationOperation; revision?: number } = {
+      imageKey: asText(event['imageKey'], `${at}.imageKey`),
+      operation: asImageOperation(event['operation'], `${at}.operation`),
+    }
+    if (revision !== undefined) parsed.revision = revision
+    return parsed
+  })
+}
+
+/** Require one of the durable image verbs. */
+function asImageOperation(value: unknown, path: string): ImageObservationOperation {
+  const operation = IMAGE_OPERATIONS[asText(value, path)]
+  if (operation === undefined) {
+    throw new GoldenCaseError(`${path} must be one of ${Object.keys(IMAGE_OPERATIONS).join(', ')}`)
+  }
+  return operation
+}
+
+/** Require an array of quality limitations. */
+function asQualityIssueArray(value: unknown, path: string): ImageQualityIssue[] {
+  return asArray(value, path).map((entry, index) => {
+    const at = `${path}[${String(index)}]`
+    const issue = QUALITY_ISSUES[asText(entry, at)]
+    if (issue === undefined) {
+      throw new GoldenCaseError(`${at} must be one of ${Object.keys(QUALITY_ISSUES).join(', ')}`)
+    }
+    return issue
+  })
 }
 
 /** Read the tool calls one turn must produce. */

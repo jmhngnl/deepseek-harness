@@ -23,19 +23,25 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 const ROSTER = fileURLToPath(new URL('../golden/', import.meta.url))
 
 /**
- * The three tools a golden case may route to. A case that named anything else
+ * The five tools a golden case may route to. A case that named anything else
  * would be measuring a coding agent's surface, which this harness's subject
  * does not have.
  */
-const MEDICAL_TOOLS = ['medical_case_intake', 'medical_case_update', 'medical_case_get']
+const MEDICAL_TOOLS = [
+  'medical_case_intake', 'medical_case_update', 'medical_case_get',
+  'medical_image_observe', 'medical_image_get',
+]
 
 /** A mutable golden-case document, so one test can break exactly one member. */
 interface MutableTurn {
   user: string
+  images?: unknown[]
   expect: {
     toolRouting: { kind: string; calls: { name: string; arguments?: unknown }[] }
     caseState?: unknown
     mutation?: unknown
+    imageObservations?: unknown[]
+    imageMutation?: unknown
   }
 }
 
@@ -49,7 +55,7 @@ interface MutableCase {
 /** The smallest document that satisfies the contract. */
 function validCase(): MutableCase {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'restatement',
     description: 'A minimal document that isolates one contract violation at a time.',
     turns: [{
@@ -77,7 +83,7 @@ function callOf(document: MutableCase): { name: string; arguments?: unknown } {
 type Violation = readonly [rule: string, mutate: (document: MutableCase) => void, message: string]
 
 const VIOLATIONS: readonly Violation[] = [
-  ['a document version the reader does not know', (d) => { d.schemaVersion = 2 }, 'doc.schemaVersion must be 1'],
+  ['a document version the reader does not know', (d) => { d.schemaVersion = 3 }, 'doc.schemaVersion must be 2'],
   ['a blank case id', (d) => { d.id = '  ' }, 'doc.id must be a non-empty string'],
   ['a missing case id', (d) => { Reflect.deleteProperty(d, 'id') }, 'doc.id must be a non-empty string'],
   ['a blank description', (d) => { d.description = '' }, 'doc.description must be a non-empty string'],
@@ -115,6 +121,73 @@ const VIOLATIONS: readonly Violation[] = [
   ['a negative record count', (d) => { turnOf(d).expect.mutation = { eventCountDelta: -1 } }, 'doc.turns[0].expect.mutation.eventCountDelta must be a whole number'],
   ['an operation the domain does not record', (d) => { turnOf(d).expect.mutation = { operations: ['delete'] } }, 'doc.turns[0].expect.mutation.operations[0] must be one of'],
   ['operations that are not a list', (d) => { turnOf(d).expect.mutation = { operations: 'create' } }, 'doc.turns[0].expect.mutation.operations must be an array'],
+
+  // ── The image members ────────────────────────────────────────────────────
+  ['images that are not a list', (d) => { Reflect.set(turnOf(d), 'images', {}) }, 'doc.turns[0].images must be an array'],
+  ['an empty image list', (d) => { turnOf(d).images = [] }, 'doc.turns[0].images must name at least one image'],
+  ['an image member the contract does not define', (d) => {
+    turnOf(d).images = [{ key: 'image-1', fixture: 'synthetic-visible-patch', path: 'x.png' }]
+  }, 'doc.turns[0].images[0].path is not a member'],
+  ['a blank image key', (d) => {
+    turnOf(d).images = [{ key: ' ', fixture: 'synthetic-visible-patch' }]
+  }, 'doc.turns[0].images[0].key must be a non-empty string'],
+  ['an unregistered fixture', (d) => {
+    turnOf(d).images = [{ key: 'image-1', fixture: 'rash.png' }]
+  }, 'doc.turns[0].images[0].fixture "rash.png" is not a registered fixture'],
+  ['a fixture path rather than a registry id', (d) => {
+    turnOf(d).images = [{ key: 'image-1', fixture: '../fixtures/images/synthetic-visible-patch.png' }]
+  }, 'is not a registered fixture'],
+  ['the same image key twice in one turn', (d) => {
+    turnOf(d).images = [
+      { key: 'image-1', fixture: 'synthetic-visible-patch' },
+      { key: 'image-1', fixture: 'synthetic-visible-patch' },
+    ]
+  }, 'doc.turns[0].images[1].key "image-1" is used twice in this turn'],
+  ['one key naming two fixtures across turns', (d) => {
+    turnOf(d).images = [{ key: 'image-1', fixture: 'synthetic-visible-patch' }]
+    d.turns.push({
+      user: '再看一次',
+      images: [{ key: 'image-1', fixture: 'synthetic-second-view' }],
+      expect: { toolRouting: { kind: 'exact', calls: [] } },
+    })
+  }, 'names fixture "synthetic-second-view", but an earlier turn named "synthetic-visible-patch"'],
+  ['image observations that are not a list', (d) => {
+    Reflect.set(turnOf(d).expect, 'imageObservations', {})
+  }, 'doc.turns[0].expect.imageObservations must be an array'],
+  ['an empty image-observation list', (d) => { turnOf(d).expect.imageObservations = [] }, 'must name at least one image'],
+  ['an image-observation member the contract does not define', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1', diagnosis: 'eczema' }]
+  }, 'doc.turns[0].expect.imageObservations[0].diagnosis is not a member'],
+  ['an image observation without a key', (d) => {
+    turnOf(d).expect.imageObservations = [{ revision: 1 }]
+  }, 'doc.turns[0].expect.imageObservations[0].imageKey must be a non-empty string'],
+  ['the same imageKey twice in one expectation', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1' }, { imageKey: 'image-1' }]
+  }, 'doc.turns[0].expect.imageObservations must not name the same imageKey twice'],
+  ['findings and minimumFindings together', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1', findings: ['red patch'], minimumFindings: 1 }]
+  }, 'doc.turns[0].expect.imageObservations[0] must not carry both findings and minimumFindings'],
+  ['a quality issue the domain cannot name', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1', qualityIssues: ['looks_infected'] }]
+  }, 'doc.turns[0].expect.imageObservations[0].qualityIssues[0] must be one of blur, poor_lighting'],
+  ['a body region that is blank rather than null', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1', bodyRegion: '' }]
+  }, 'doc.turns[0].expect.imageObservations[0].bodyRegion must be a non-empty string'],
+  ['an image revision below one', (d) => {
+    turnOf(d).expect.imageObservations = [{ imageKey: 'image-1', revision: 0 }]
+  }, 'doc.turns[0].expect.imageObservations[0].revision must be a whole number of at least 1'],
+  ['an image-mutation member the contract does not define', (d) => {
+    Reflect.set(turnOf(d).expect, 'imageMutation', { appended: 1 })
+  }, 'doc.turns[0].expect.imageMutation.appended is not a member'],
+  ['an image record without a key', (d) => {
+    turnOf(d).expect.imageMutation = { events: [{ operation: 'observe' }] }
+  }, 'doc.turns[0].expect.imageMutation.events[0].imageKey must be a non-empty string'],
+  ['an image operation the domain does not record', (d) => {
+    turnOf(d).expect.imageMutation = { events: [{ imageKey: 'image-1', operation: 'amend' }] }
+  }, 'doc.turns[0].expect.imageMutation.events[0].operation must be one of observe, update'],
+  ['a negative image record count', (d) => {
+    turnOf(d).expect.imageMutation = { eventCountDelta: -1 }
+  }, 'doc.turns[0].expect.imageMutation.eventCountDelta must be a whole number'],
 ]
 
 describe('the golden-case contract', () => {
@@ -148,7 +221,7 @@ describe('the golden-case contract', () => {
     turnOf(document).expect.mutation = { changed: true, eventCountDelta: 2, operations: ['create', 'update'] }
 
     expect(parseGoldenCase(document, 'doc')).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: 'restatement',
       description: 'A minimal document that isolates one contract violation at a time.',
       turns: [{
@@ -176,6 +249,83 @@ describe('the golden-case contract', () => {
     const expectation = parseGoldenCase(validCase(), 'doc').turns[0]?.expect
     expect(expectation).not.toHaveProperty('caseState')
     expect(expectation).not.toHaveProperty('mutation')
+    expect(expectation).not.toHaveProperty('imageObservations')
+    expect(expectation).not.toHaveProperty('imageMutation')
+    expect(parseGoldenCase(validCase(), 'doc').turns[0]).not.toHaveProperty('images')
+  })
+
+  it('reads every image member the contract defines', () => {
+    const document = validCase()
+    turnOf(document).images = [
+      { key: 'image-1', fixture: 'synthetic-visible-patch' },
+      { key: 'image-2', fixture: 'synthetic-second-view' },
+    ]
+    turnOf(document).expect.imageObservations = [
+      {
+        imageKey: 'image-1',
+        bodyRegion: 'forearm',
+        findings: ['red patch'],
+        usable: true,
+        qualityIssues: ['blur'],
+        uncertainty: ['depth unclear'],
+        revision: 1,
+      },
+      { imageKey: 'image-2', bodyRegion: null, minimumFindings: 1, usable: false },
+    ]
+    turnOf(document).expect.imageMutation = {
+      changed: true,
+      eventCountDelta: 1,
+      events: [{ imageKey: 'image-1', operation: 'observe', revision: 1 }],
+    }
+
+    const parsed = parseGoldenCase(document, 'doc')
+    expect(parsed.turns[0]?.images).toEqual([
+      { key: 'image-1', fixture: 'synthetic-visible-patch' },
+      { key: 'image-2', fixture: 'synthetic-second-view' },
+    ])
+    expect(parsed.turns[0]?.expect.imageObservations).toEqual([
+      {
+        imageKey: 'image-1',
+        bodyRegion: 'forearm',
+        findings: ['red patch'],
+        usable: true,
+        qualityIssues: ['blur'],
+        uncertainty: ['depth unclear'],
+        revision: 1,
+      },
+      { imageKey: 'image-2', bodyRegion: null, minimumFindings: 1, usable: false },
+    ])
+    expect(parsed.turns[0]?.expect.imageMutation).toEqual({
+      changed: true,
+      eventCountDelta: 1,
+      events: [{ imageKey: 'image-1', operation: 'observe', revision: 1 }],
+    })
+  })
+
+  it('reads an image mutation that pins no record list', () => {
+    const document = validCase()
+    turnOf(document).expect.imageMutation = { changed: false, eventCountDelta: 0 }
+
+    expect(parseGoldenCase(document, 'doc').turns[0]?.expect.imageMutation)
+      .toEqual({ changed: false, eventCountDelta: 0 })
+  })
+
+  it('reads an image mutation that pins only a record list', () => {
+    const document = validCase()
+    const events = [{ imageKey: 'image-1', operation: 'observe', revision: 1 }]
+    turnOf(document).expect.imageMutation = { events }
+
+    expect(parseGoldenCase(document, 'doc').turns[0]?.expect.imageMutation).toEqual({ events })
+  })
+
+  it('leaves an image member out when the document does not pin it', () => {
+    const document = validCase()
+    turnOf(document).expect.imageObservations = [{ imageKey: 'image-1' }]
+
+    // An expectation naming only the image it is about pins nothing about it,
+    // and an expectation with no image mutation member asserts none.
+    expect(parseGoldenCase(document, 'doc').turns[0]?.expect.imageObservations).toEqual([{ imageKey: 'image-1' }])
+    expect(parseGoldenCase(document, 'doc').turns[0]?.expect.imageMutation).toBeUndefined()
   })
 
   it('leaves a member out when the document does not pin it', () => {
@@ -203,9 +353,12 @@ describe('loading a roster', () => {
 
   it('reads the shipped roster, whose ids are unique', () => {
     const cases = loadGoldenCases(ROSTER)
-    expect(cases).toHaveLength(8)
-    expect(new Set(cases.map(golden => golden.id)).size).toBe(8)
-    expect(cases.every(golden => golden.schemaVersion === 1)).toBe(true)
+    // Eight text cases and seven image cases: three that a scripted model can
+    // pin exactly, three that exercise the image revision rules, and one the
+    // live smoke replays.
+    expect(cases).toHaveLength(15)
+    expect(new Set(cases.map(golden => golden.id)).size).toBe(15)
+    expect(cases.every(golden => golden.schemaVersion === 2)).toBe(true)
   })
 
   it('names every file after the case it holds', () => {
@@ -232,9 +385,12 @@ describe('what the shipped roster is allowed to say', () => {
 
   it('states every case from a fresh session rather than assuming one', () => {
     for (const golden of cases) {
-      const first = golden.turns[0]
-      expect(first?.expect.caseState, `${golden.id} must state the case its own first turn records`).toBeDefined()
-      expect(first?.expect.caseState?.revision, `${golden.id} must open the case at revision one`).toBe(1)
+      // The first turn that asserts a case state must be the turn that opens it:
+      // a case may not inherit a record, and a case that records none — an
+      // image-only case, say — asserts none.
+      const asserting = golden.turns.find(turn => turn.expect.caseState !== undefined)
+      if (asserting === undefined) continue
+      expect(asserting.expect.caseState?.revision, `${golden.id} must open the case at revision one`).toBe(1)
     }
   })
 

@@ -12,6 +12,8 @@
 import { describe, expect, it } from 'vitest'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { MedicalImageObservation } from '@deepseek-ai/dsh-medical-image'
 import { observeTurn } from '../src/index.ts'
 
 /** A turn that opened at 1,000 ms. */
@@ -78,5 +80,131 @@ describe('observing a turn', () => {
       name: 'REQUEST_FAILED',
       message: 'the provider refused the request',
     })
+  })
+})
+
+// ── The image projection ───────────────────────────────────────────────────
+
+/** One authoritative observation, as the domain publishes it. */
+function storedObservation(attachmentId: string, revision = 1): MedicalImageObservation {
+  return {
+    attachment: {
+      attachmentId: AttachmentId(attachmentId),
+      mediaType: 'image/png',
+      bytes: 2_048,
+      width: 64,
+      height: 64,
+      name: 'fixture.png',
+    },
+    revision,
+    bodyRegion: 'forearm',
+    findings: ['red patch'],
+    quality: { usable: true, issues: ['blur'] },
+    uncertainty: ['depth unclear'],
+    createdAt: 1_000,
+    updatedAt: 1_000,
+  }
+}
+
+/** One durable image record, as the domain appends it. */
+function imageEvent(attachmentId: string, operation: 'observe' | 'update', revision: number, seq: number): SessionEvent {
+  return {
+    type: 'medical/image-observation',
+    seq: SessionSeq(seq),
+    time: 1_200,
+    data: {
+      kind: 'medical/image-observation',
+      version: 1,
+      operation,
+      observation: storedObservation(attachmentId, revision),
+    },
+  }
+}
+
+const KEY_ONE = `sha256:${'a'.repeat(64)}`
+const KEY_TWO = `sha256:${'b'.repeat(64)}`
+
+describe('projecting the image dimension of a turn', () => {
+  it('names an observation and an event by the case key the runner resolved', () => {
+    const observed = observeTurn({
+      turnIndex: 0,
+      user: '看一下',
+      events: [imageEvent(KEY_ONE, 'observe', 1, 5)],
+      caseState: null,
+      images: [{ imageKey: 'image-1', attachmentId: KEY_ONE }],
+      imageObservations: [storedObservation(KEY_ONE)],
+    })
+
+    expect(observed.imageObservations).toEqual([{
+      imageKey: 'image-1',
+      attachmentId: KEY_ONE,
+      revision: 1,
+      bodyRegion: 'forearm',
+      findings: ['red patch'],
+      usable: true,
+      qualityIssues: ['blur'],
+      uncertainty: ['depth unclear'],
+    }])
+    expect(observed.imageEvents).toEqual([{
+      imageKey: 'image-1',
+      attachmentId: KEY_ONE,
+      operation: 'observe',
+      revision: 1,
+      eventSeq: 5,
+    }])
+  })
+
+  it('keeps two images apart by their own keys', () => {
+    const observed = observeTurn({
+      turnIndex: 0,
+      user: '两张',
+      events: [imageEvent(KEY_ONE, 'observe', 1, 5), imageEvent(KEY_TWO, 'observe', 1, 6)],
+      caseState: null,
+      images: [
+        { imageKey: 'image-1', attachmentId: KEY_ONE },
+        { imageKey: 'image-2', attachmentId: KEY_TWO },
+      ],
+      imageObservations: [storedObservation(KEY_ONE), storedObservation(KEY_TWO)],
+    })
+
+    expect(observed.imageObservations.map(entry => entry.imageKey)).toEqual(['image-1', 'image-2'])
+    expect(observed.imageEvents.map(entry => entry.imageKey)).toEqual(['image-1', 'image-2'])
+  })
+
+  it('reports an attachment this case never admitted with no key rather than guessing one', () => {
+    const observed = observeTurn({
+      turnIndex: 0,
+      user: '看一下',
+      events: [imageEvent(KEY_TWO, 'observe', 1, 5)],
+      caseState: null,
+      images: [{ imageKey: 'image-1', attachmentId: KEY_ONE }],
+      imageObservations: [storedObservation(KEY_TWO)],
+    })
+
+    expect(observed.imageObservations[0]?.imageKey).toBeNull()
+    expect(observed.imageEvents[0]?.imageKey).toBeNull()
+  })
+
+  it('reports no image at all for a turn whose harness mounted no image domain', () => {
+    const observed = observeTurn({ turnIndex: 0, user: '我头疼', events: [], caseState: null })
+
+    expect(observed.imageObservations).toEqual([])
+    expect(observed.imageEvents).toEqual([])
+  })
+
+  it('keeps the first key when one attachment was admitted under two', () => {
+    const observed = observeTurn({
+      turnIndex: 0,
+      user: '同一张',
+      events: [],
+      caseState: null,
+      images: [
+        { imageKey: 'image-1', attachmentId: KEY_ONE },
+        { imageKey: 'again', attachmentId: KEY_ONE },
+      ],
+      imageObservations: [storedObservation(KEY_ONE)],
+    })
+
+    expect(observed.imageObservations[0]?.imageKey).toBe('image-1')
   })
 })

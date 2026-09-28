@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-keeps-the-case-untouched",
+  "description": "A recorded case, then an image observation: the observation appends its own durable record and leaves the patient-reported case exactly as it was, with no case record appended and no field changed.",
+  "turns": [
+    {
+      "user": "我头疼、发烧两天了，25 岁",
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_case_intake" }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": "两天",
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "operations": ["create"]
+        }
+      }
+    },
+    {
+      "user": "另外我拍了一张照片，你看一下",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "caseState": {
+          "symptoms": ["头疼", "发烧"],
+          "duration": "两天",
+          "age": 25,
+          "revision": 1,
+          "missingFields": []
+        },
+        "mutation": {
+          "changed": false,
+          "eventCountDelta": 0
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "findings": ["red patch"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    }
+  ]
+}

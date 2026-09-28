@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "intake-restatement-writes-nothing",
   "description": "Repeating facts the case already holds is a restatement rather than a change: it again routes to intake, appends no record, and leaves the revision where it is.",
   "turns": [

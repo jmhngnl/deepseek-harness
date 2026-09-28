@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "id": "image-observe-restatement-is-a-noop",
+  "description": "The same image observed twice with a byte-identical full snapshot: the second call is a no-op, so the revision stays at one and no second durable record is appended.",
+  "turns": [
+    {
+      "user": "我拍了一张照片，你看看",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "bodyRegion": "forearm",
+            "findings": ["red patch"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": true,
+          "eventCountDelta": 1,
+          "events": [
+            { "imageKey": "image-1", "operation": "observe", "revision": 1 }
+          ]
+        }
+      }
+    },
+    {
+      "user": "再看一次，记录完整一些",
+      "images": [
+        { "key": "image-1", "fixture": "synthetic-visible-patch" }
+      ],
+      "expect": {
+        "toolRouting": {
+          "kind": "exact",
+          "calls": [
+            { "name": "medical_image_observe" }
+          ]
+        },
+        "imageObservations": [
+          {
+            "imageKey": "image-1",
+            "revision": 1,
+            "bodyRegion": "forearm",
+            "findings": ["red patch"],
+            "usable": true
+          }
+        ],
+        "imageMutation": {
+          "changed": false,
+          "eventCountDelta": 0
+        }
+      }
+    }
+  ]
+}

@@ -113,6 +113,11 @@ function summarize(runs: readonly GoldenCaseRun[]): EvalSummary {
   let stateAssertionsTotal = 0
   let missingFieldAssertionsPassed = 0
   let missingFieldAssertionsTotal = 0
+  let imageAssertionsPassed = 0
+  let imageAssertionsTotal = 0
+  let imageMutationAssertionsPassed = 0
+  let imageMutationAssertionsTotal = 0
+  let unexpectedImageMutations = 0
   let toolErrors = 0
   let unexpectedMutations = 0
   let timeouts = 0
@@ -142,8 +147,17 @@ function summarize(runs: readonly GoldenCaseRun[]): EvalSummary {
           missingFieldAssertionsTotal += 1
           if (result.failureType === null) missingFieldAssertionsPassed += 1
         }
+        if (result.kind === 'imageState') {
+          imageAssertionsTotal += 1
+          if (result.failureType === null) imageAssertionsPassed += 1
+        }
+        if (result.kind === 'imageMutation') {
+          imageMutationAssertionsTotal += 1
+          if (result.failureType === null) imageMutationAssertionsPassed += 1
+        }
         if (result.failureType === 'TOOL_ERROR') toolErrors += 1
         if (result.failureType === 'UNEXPECTED_CASE_MUTATION') unexpectedMutations += 1
+        if (result.failureType === 'UNEXPECTED_IMAGE_MUTATION') unexpectedImageMutations += 1
         if (result.failureType === 'SESSION_TIMEOUT') timeouts += 1
         if (result.failureType === 'RUNTIME_ERROR') runtimeErrors += 1
       }
@@ -164,6 +178,11 @@ function summarize(runs: readonly GoldenCaseRun[]): EvalSummary {
     stateAssertionsTotal,
     missingFieldAssertionsPassed,
     missingFieldAssertionsTotal,
+    imageAssertionsPassed,
+    imageAssertionsTotal,
+    imageMutationAssertionsPassed,
+    imageMutationAssertionsTotal,
+    unexpectedImageMutations,
     toolErrors,
     unexpectedMutations,
     timeouts,
@@ -206,7 +225,18 @@ function caseReport(run: GoldenCaseRun): CaseReport {
   }
 }
 
-/** Present one turn, without the conversation text a report never needs. */
+/**
+ * Present one turn, without the conversation text a report never needs.
+ *
+ * The image observations come from the evaluator's own projected shape, so a
+ * report can never carry image bytes, a fixture path, or an attachment storage
+ * location even by accident.
+ */
 function reportTurn(turn: TurnEvaluation): CaseReportTurn {
-  return { turnIndex: turn.turnIndex, toolCalls: turn.toolCalls, caseState: turn.caseState }
+  return {
+    turnIndex: turn.turnIndex,
+    toolCalls: turn.toolCalls,
+    caseState: turn.caseState,
+    imageObservations: turn.imageObservations,
+  }
 }

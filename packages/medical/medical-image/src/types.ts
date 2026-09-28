@@ -96,10 +96,13 @@ export interface MedicalImageObservation {
  *
  * This is a full snapshot, not a patch. Every field is required, so each call
  * declares the whole current observation for that image: an omitted field is a
- * schema error, never a request to keep an older value. A patch-shaped tool would
- * let a model silently drop a finding it merely forgot to repeat, and the durable
- * event is a full state anyway — so the wire contract now says the same thing the
- * log does.
+ * schema error, never a request to keep an older value. Requiring the whole
+ * observation is what makes a removal sayable — a finding the caller does not
+ * restate is deliberately gone, because the new snapshot simply does not contain
+ * it. Patch semantics would have done the opposite and preserved the field,
+ * leaving a reader unable to tell "the observer no longer sees this" from "the
+ * observer forgot to repeat it". The durable event carries a full state too, so
+ * the wire contract and the log say the same thing.
  *
  * `bodyRegion` is required AND nullable on purpose. "The observer did not state a
  * region" is a fact worth recording, and it is not the same as the caller having

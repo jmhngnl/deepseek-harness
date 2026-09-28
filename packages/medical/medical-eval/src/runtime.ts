@@ -7,15 +7,25 @@ import { isJsonValue } from '@deepseek-ai/dsh-util-values'
  * Contract version of the golden-case document. A case declares the version it
  * was written against, and the loader refuses a document that declares another,
  * so extending the contract is a visible act rather than a silent widening.
+ *
+ * Version 2 adds the image input, the image-observation expectation, and the
+ * image-mutation expectation. It is a new version rather than a widening of
+ * version 1 because a version-1 reader would silently ignore an `images` member
+ * it does not know, which is exactly the failure the strict reader exists to
+ * prevent.
  */
-export const GOLDEN_CASE_SCHEMA_VERSION = 1
+export const GOLDEN_CASE_SCHEMA_VERSION = 2
 
 /**
  * Contract version of the evaluation report, covering the failure taxonomy the
  * report carries. Raised together with {@link GOLDEN_CASE_SCHEMA_VERSION} when
  * a classification is added or redefined.
+ *
+ * Version 2 adds the image failure classifications, the `imageState` and
+ * `imageMutation` assertion kinds, the per-turn image observations, and the
+ * image dimensions of the summary.
  */
-export const EVAL_REPORT_SCHEMA_VERSION = 1
+export const EVAL_REPORT_SCHEMA_VERSION = 2
 
 /**
  * Rejection raised while reading a golden case. The message names the exact

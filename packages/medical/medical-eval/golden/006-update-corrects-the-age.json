@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "update-corrects-the-age",
   "description": "Correcting the recorded age advances the revision and leaves every other fact, including the recorded duration, untouched.",
   "turns": [

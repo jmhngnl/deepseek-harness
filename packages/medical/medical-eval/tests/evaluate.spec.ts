@@ -17,7 +17,10 @@ import type {
   EvaluationResult,
   FailureType,
   GoldenCase,
+  ImageObservationExpectation,
   ObservedCaseEvent,
+  ObservedImageEvent,
+  ObservedImageObservation,
   ObservedToolCall,
   ObservedToolResult,
   ObservedTurn,
@@ -64,6 +67,37 @@ function caseEventOf(operation: 'create' | 'update', revision: number, seq = 3):
   return { operation, revision, eventSeq: seq }
 }
 
+/** One authoritative image observation, defaulted so a test states one difference. */
+function imageObservationOf(patch: Partial<ObservedImageObservation> = {}): ObservedImageObservation {
+  return {
+    imageKey: 'image-1',
+    attachmentId: `sha256:${'a'.repeat(64)}`,
+    revision: 1,
+    bodyRegion: null,
+    findings: ['red patch'],
+    usable: true,
+    qualityIssues: [],
+    uncertainty: [],
+    ...patch,
+  }
+}
+
+/** One durable image-observation record a turn appended. */
+function imageEventOf(
+  operation: 'observe' | 'update',
+  revision: number,
+  patch: Partial<ObservedImageEvent> = {},
+): ObservedImageEvent {
+  return {
+    imageKey: 'image-1',
+    attachmentId: `sha256:${'a'.repeat(64)}`,
+    operation,
+    revision,
+    eventSeq: 4,
+    ...patch,
+  }
+}
+
 /** An observation with nothing observed, so one test states one difference. */
 function observedTurn(patch: Partial<ObservedTurn> = {}): ObservedTurn {
   return {
@@ -73,6 +107,8 @@ function observedTurn(patch: Partial<ObservedTurn> = {}): ObservedTurn {
     toolResults: [],
     caseState: null,
     caseEvents: [],
+    imageObservations: [],
+    imageEvents: [],
     usage: null,
     timing: null,
     timedOut: false,
@@ -94,7 +130,7 @@ function expectation(patch: Partial<TurnExpectation> = {}): TurnExpectation {
 /** A synthetic golden case built from one expectation per turn. */
 function goldenCase(expectations: readonly TurnExpectation[], id = 'synthetic'): GoldenCase {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     description: 'A synthetic case used to pin one evaluation rule.',
     turns: expectations.map((expect, index) => ({ user: `提问 ${String(index + 1)}`, expect })),
@@ -164,7 +200,9 @@ describe('a turn that satisfies its expectation', () => {
     ])
     expect(first(results).detail).toBe('the turn called ["medical_case_intake"], matching the expectation')
     expect(results[1]?.detail).toBe('the pinned arguments matched')
-    expect(first(results).evidence).toEqual({ toolCallSeqs: [1], toolResultSeqs: [2], caseEventSeqs: [3] })
+    expect(first(results).evidence).toEqual({
+      toolCallSeqs: [1], toolResultSeqs: [2], caseEventSeqs: [3], imageEventSeqs: [],
+    })
   })
 
   it('asserts nothing about a case or a mutation the expectation does not mention', () => {
@@ -584,5 +622,248 @@ describe('assembling a case evaluation', () => {
     expect(evaluation.turns[0]?.toolCalls).toEqual(['medical_case_get'])
     expect(evaluation.turns[0]?.usage).toEqual({ inputTokens: 12, outputTokens: 3 })
     expect(evaluation.turns[0]?.caseState?.revision).toBe(1)
+  })
+})
+
+// ── The image dimension ────────────────────────────────────────────────────
+
+/** A turn expectation that pins one image observation and nothing else. */
+function imageExpectation(patch: Partial<ImageObservationExpectation> = {}): TurnExpectation {
+  return expectation({ imageObservations: [{ imageKey: 'image-1', ...patch }] })
+}
+
+/**
+ * The image assertions out of a result set.
+ *
+ * The default expectation always contributes one routing assertion, so a test
+ * about the image dimension reads its own results rather than a total.
+ */
+function imageResults(results: readonly EvaluationResult[], kind: 'imageState' | 'imageMutation'): EvaluationResult[] {
+  return results.filter(result => result.kind === kind)
+}
+
+describe('asserting an authoritative image observation', () => {
+  it('passes every field the expectation pins', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ bodyRegion: null, findings: ['red patch'], usable: true, qualityIssues: [], uncertainty: [], revision: 1 }),
+      observedTurn({ imageObservations: [imageObservationOf()] }),
+    ), 'imageState')
+
+    expect(results).toHaveLength(6)
+    expect(results.every(result => result.failureType === null)).toBe(true)
+    expect(results.map(result => result.assertion)).toEqual([
+      'image-1 bodyRegion', 'image-1 findings', 'image-1 usable', 'image-1 qualityIssues', 'image-1 uncertainty', 'image-1 revision',
+    ])
+  })
+
+  it('reports the field that differs, one assertion per pinned field', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ findings: ['red patch', 'scaling'], usable: false }),
+      observedTurn({ imageObservations: [imageObservationOf()] }),
+    ), 'imageState')
+
+    expect(results[0]?.failureType).toBe('IMAGE_OBSERVATION_MISMATCH')
+    expect(results[0]?.detail).toContain('the observation holds ["red patch"]')
+    expect(results[1]?.failureType).toBe('IMAGE_OBSERVATION_MISMATCH')
+    expect(results[1]?.assertion).toBe('image-1 usable')
+  })
+
+  it('reports a revision the observation did not reach under its own classification', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ revision: 2 }),
+      observedTurn({ imageObservations: [imageObservationOf({ revision: 1 })] }),
+    ), 'imageState')
+
+    expect(results[0]?.failureType).toBe('IMAGE_REVISION_MISMATCH')
+  })
+
+  it('reports an image the session holds no observation for, once', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ revision: 1, usable: true, findings: ['red patch'] }),
+      observedTurn(),
+    ), 'imageState')
+
+    expect(results).toHaveLength(1)
+    expect(results[0]?.failureType).toBe('IMAGE_OBSERVATION_MISMATCH')
+    expect(results[0]?.detail).toContain('holds none for that image')
+    expect(results[0]?.actual).toBeNull()
+  })
+
+  it('asserts nothing about an image the expectation does not name', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ revision: 1 }),
+      observedTurn({ imageObservations: [imageObservationOf({ revision: 4, usable: false })] }),
+    ), 'imageState')
+
+    expect(results.map(result => result.assertion)).toEqual(['image-1 revision'])
+    expect(results[0]?.failureType).toBe('IMAGE_REVISION_MISMATCH')
+  })
+
+  it('passes a minimum finding count without fixing the wording', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ minimumFindings: 1, usable: true }),
+      observedTurn({ imageObservations: [imageObservationOf({ findings: ['a red disc on a light field'] })] }),
+    ), 'imageState')
+
+    expect(results.every(result => result.failureType === null)).toBe(true)
+    expect(results[0]?.detail).toContain('at least the required 1')
+  })
+
+  it('reports too few findings', () => {
+    const results = imageResults(evaluateTurn(
+      imageExpectation({ minimumFindings: 2 }),
+      observedTurn({ imageObservations: [imageObservationOf({ findings: ['red patch'] })] }),
+    ), 'imageState')
+
+    expect(results[0]?.failureType).toBe('IMAGE_OBSERVATION_MISMATCH')
+    expect(results[0]?.assertion).toBe('image-1 minimumFindings')
+    expect(results[0]?.actual).toBe(1)
+  })
+})
+
+describe('asserting a durable image mutation', () => {
+  it('passes a change the turn made', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({
+        imageMutation: {
+          changed: true,
+          eventCountDelta: 1,
+          events: [{ imageKey: 'image-1', operation: 'observe', revision: 1 }],
+        },
+      }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1)] }),
+    ), 'imageMutation')
+
+    expect(results).toHaveLength(3)
+    expect(results.every(result => result.failureType === null)).toBe(true)
+  })
+
+  it('passes a no-op as a zero delta', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { changed: false, eventCountDelta: 0 } }),
+      observedTurn(),
+    ), 'imageMutation')
+
+    expect(results).toHaveLength(2)
+    expect(results.every(result => result.failureType === null)).toBe(true)
+  })
+
+  it('reports a change the turn never made', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { changed: true, eventCountDelta: 1 } }),
+      observedTurn(),
+    ), 'imageMutation')
+
+    expect(results.map(result => result.failureType)).toEqual([
+      'EXPECTED_IMAGE_MUTATION_MISSING', 'EXPECTED_IMAGE_MUTATION_MISSING',
+    ])
+  })
+
+  it('reports a change the expectation forbade', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { changed: false, eventCountDelta: 0 } }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1)] }),
+    ), 'imageMutation')
+
+    expect(results.map(result => result.failureType)).toEqual([
+      'UNEXPECTED_IMAGE_MUTATION', 'UNEXPECTED_IMAGE_MUTATION',
+    ])
+  })
+
+  it('reports the records the turn appended against the ones expected', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { events: [{ imageKey: 'image-1', operation: 'observe', revision: 1 }] } }),
+      observedTurn({ imageEvents: [imageEventOf('update', 2)] }),
+    ), 'imageMutation')
+
+    expect(results).toHaveLength(1)
+    expect(results[0]?.failureType).toBe('UNEXPECTED_IMAGE_MUTATION')
+    expect(results[0]?.assertion).toBe('image records')
+  })
+
+  it('reports a pinned revision the record did not carry under its own classification', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { events: [{ imageKey: 'image-1', operation: 'update', revision: 3 }] } }),
+      observedTurn({ imageEvents: [imageEventOf('update', 2)] }),
+    ), 'imageMutation')
+
+    expect(results[0]?.failureType).toBe('IMAGE_REVISION_MISMATCH')
+  })
+
+  it('reports a record about another image', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { events: [{ imageKey: 'image-2', operation: 'observe', revision: 1 }] } }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1)] }),
+    ), 'imageMutation')
+
+    expect(results[0]?.failureType).toBe('UNEXPECTED_IMAGE_MUTATION')
+  })
+
+  it('reports records the turn appended too few of', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({
+        imageMutation: {
+          events: [
+            { imageKey: 'image-1', operation: 'observe', revision: 1 },
+            { imageKey: 'image-2', operation: 'observe', revision: 1 },
+          ],
+        },
+      }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1)] }),
+    ), 'imageMutation')
+
+    expect(results[0]?.failureType).toBe('EXPECTED_IMAGE_MUTATION_MISSING')
+    expect(results[0]?.detail).toContain('appended 1 image record(s) where the expectation requires 2')
+  })
+
+  it('reports a record the expectation does not describe at all', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { events: [] } }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1)] }),
+    ), 'imageMutation')
+
+    expect(results[0]?.failureType).toBe('UNEXPECTED_IMAGE_MUTATION')
+    expect(results[0]?.detail).toContain('appended 1 image record(s) where the expectation requires 0')
+  })
+
+  it('carries the image event sequences as evidence', () => {
+    const results = imageResults(evaluateTurn(
+      expectation({ imageMutation: { changed: true } }),
+      observedTurn({ imageEvents: [imageEventOf('observe', 1, { eventSeq: 9 })] }),
+    ), 'imageMutation')
+
+    expect(results[0]?.evidence.imageEventSeqs).toEqual([9])
+  })
+})
+
+describe('keeping the image dimension separate from the case dimension', () => {
+  it('asserts nothing about either domain the expectation does not mention', () => {
+    const results = evaluateTurn(
+      // The expectation pins one image field, so the case state and the case
+      // records the observation sits beside are simply not its subject.
+      expectation({ imageObservations: [{ imageKey: 'image-1', revision: 1 }] }),
+      observedTurn({
+        caseState: view(3),
+        caseEvents: [caseEventOf('update', 3)],
+        imageObservations: [imageObservationOf()],
+      }),
+    )
+
+    expect(results.map(result => result.kind)).toEqual(['toolRouting', 'imageState'])
+  })
+
+  it('reports an image observation and a case state failure as different dimensions', () => {
+    const results = evaluateTurn(
+      expectation({
+        caseState: { revision: 2 },
+        imageObservations: [{ imageKey: 'image-1', revision: 2 }],
+      }),
+      observedTurn({ caseState: view(1), imageObservations: [imageObservationOf()] }),
+    )
+
+    expect(results.filter(result => result.failureType !== null).map(result => result.kind))
+      .toEqual(['caseState', 'imageState'])
+    expect(results.filter(result => result.failureType !== null).map(result => result.failureType))
+      .toEqual(['REVISION_MISMATCH', 'IMAGE_REVISION_MISMATCH'])
   })
 })

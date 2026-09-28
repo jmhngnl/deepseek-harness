@@ -11,16 +11,23 @@
 
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { CaseOperation, CaseView, MissingField } from '@deepseek-ai/dsh-medical-case'
+import type { ImageObservationOperation, ImageQualityIssue } from '@deepseek-ai/dsh-medical-image'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 
 /**
  * How one evaluation failed.
  *
- * Failure Taxonomy **v1**. The set is the clustering key a future bad-case
+ * Failure Taxonomy **v2**. The set is the clustering key a future bad-case
  * collector and evolution planner group by, so a new member is a contract
  * change: raise {@link GoldenCase} `schemaVersion` and the report's
  * `schemaVersion` with it rather than reusing an existing name for a new
  * meaning.
+ *
+ * The image members are deliberately four and not more. A missing or wrong
+ * image tool call is already `TOOL_NOT_CALLED` / `WRONG_TOOL`, and a bad pinned
+ * argument is already `ARGUMENT_EXTRACTION_ERROR`; only the image domain's own
+ * subjects — the authoritative observation, its revision, and the durable
+ * records — need names of their own.
  */
 export type FailureType =
   /** The turn produced no tool call at all where the expectation required one. */
@@ -45,6 +52,14 @@ export type FailureType =
   | 'EXPECTED_MUTATION_MISSING'
   /** A later revision carries a different case identity than an earlier one. */
   | 'CASE_ID_CHANGED'
+  /** An authoritative image observation differs from what the expectation describes. */
+  | 'IMAGE_OBSERVATION_MISMATCH'
+  /** An image observation's durable revision is not the one the expectation describes. */
+  | 'IMAGE_REVISION_MISMATCH'
+  /** The turn appended an image record where none was expected. */
+  | 'UNEXPECTED_IMAGE_MUTATION'
+  /** The turn appended no image record where one was expected. */
+  | 'EXPECTED_IMAGE_MUTATION_MISSING'
   /** The turn did not reach quiescence inside the runner's ceiling. */
   | 'SESSION_TIMEOUT'
   /** The runtime raised while the turn was being driven. */
@@ -53,6 +68,11 @@ export type FailureType =
 /**
  * Which expectation group an evaluated assertion belongs to. This is the
  * dimension the report aggregates by; see {@link EvalSummary}.
+ *
+ * Patient-reported state and model-observed evidence stay separate dimensions
+ * here for the same reason they are separate domains: a run whose case is
+ * perfect and whose image observations are wrong must not average into one
+ * number that hides which half failed.
  */
 export type AssertionKind =
   /** Tool call sequence and the arguments the expectation pinned. */
@@ -67,6 +87,10 @@ export type AssertionKind =
   | 'mutation'
   /** Case identity and timestamp continuity across the case's revisions. */
   | 'caseIntegrity'
+  /** A field of the authoritative image observation. */
+  | 'imageState'
+  /** Whether the turn produced a durable image-observation record. */
+  | 'imageMutation'
   /** Turn completion, timeout, and agent runtime faults. */
   | 'runtime'
 
@@ -80,7 +104,7 @@ export type AssertionKind =
  */
 export interface GoldenCase {
   /** Contract version of this document. */
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   /** Stable identity, unique across the shipped roster. */
   readonly id: string
   /** What this case exists to pin, in one sentence. */
@@ -89,10 +113,32 @@ export interface GoldenCase {
   readonly turns: readonly GoldenTurn[]
 }
 
+/**
+ * One synthetic image a turn attaches, named the way a golden case can name it.
+ *
+ * A case never holds bytes, a path, or an attachment id. `fixture` is an id the
+ * package's fixture registry resolves to a file it owns, so benchmark data
+ * cannot become a filesystem-read contract and a fixture directory can move
+ * without rewriting every case. `key` is the case-local identity an expectation
+ * refers to; the runner resolves it to whichever canonical attachment id
+ * admission minted, so no expectation ever pins a digest.
+ */
+export interface GoldenImageInput {
+  /** Case-local identity, unique within the case, e.g. `image-1`. */
+  readonly key: string
+  /** Registry id of the synthetic image to attach, e.g. `synthetic-visible-patch`. */
+  readonly fixture: string
+}
+
 /** One user utterance and everything expected of the runtime's response to it. */
 export interface GoldenTurn {
   /** The fictional user text sent as this turn's only message. */
   readonly user: string
+  /**
+   * Synthetic images attached to the SAME user message as {@link GoldenTurn.user},
+   * in this order. Absent means the turn carries text only.
+   */
+  readonly images?: readonly GoldenImageInput[]
   /** What must hold once the turn reaches quiescence. */
   readonly expect: TurnExpectation
 }
@@ -105,6 +151,69 @@ export interface TurnExpectation {
   readonly caseState?: CaseStateExpectation
   /** Whether this turn must produce a durable case change, when that is the point of the turn. */
   readonly mutation?: MutationExpectation
+  /** Authoritative image observations this turn must produce, one entry per image it is about. */
+  readonly imageObservations?: readonly ImageObservationExpectation[]
+  /** Whether this turn must produce durable image-observation records, when that is the point of the turn. */
+  readonly imageMutation?: ImageMutationExpectation
+}
+
+/**
+ * Fields of one authoritative image observation an expectation pins.
+ *
+ * Every field is optional, on the same principle as
+ * {@link CaseStateExpectation}: a turn pins what it is about. That matters more
+ * here than it does for the case, because a live observer's phrasing is not
+ * reproducible — a deterministic case can pin `findings` exactly, while a live
+ * smoke pins the structure it can actually rely on.
+ *
+ * `findings` and `minimumFindings` are mutually exclusive. The first states the
+ * exact normalized list; the second only requires that the observer found
+ * something, which is what a live smoke can honestly assert without freezing a
+ * sentence.
+ */
+export interface ImageObservationExpectation {
+  /** Case-local identity of the image this expectation is about. */
+  readonly imageKey: string
+  /** The exact body region, or an explicit null for "none can be stated". */
+  readonly bodyRegion?: string | null
+  /** The exact normalized finding list, in recorded order. */
+  readonly findings?: readonly string[]
+  /** The minimum number of findings, for an expectation that must not fix the wording. */
+  readonly minimumFindings?: number
+  /** Whether any part of the image could be described. */
+  readonly usable?: boolean
+  /** The exact normalized quality-issue list, in canonical order. */
+  readonly qualityIssues?: readonly string[]
+  /** The exact normalized uncertainty list, in recorded order. */
+  readonly uncertainty?: readonly string[]
+  /** The exact durable revision. */
+  readonly revision?: number
+}
+
+/**
+ * What the turn must do to the durable image-observation records. Separate from
+ * {@link MutationExpectation} because that one describes `medical/case-change`
+ * and this one describes `medical/image-observation`: a turn can observe an
+ * image without touching the case at all, which is the separation this
+ * dimension exists to measure.
+ */
+export interface ImageMutationExpectation {
+  /** Whether the turn appended a durable image record. Equivalent to `eventCountDelta` > 0. */
+  readonly changed?: boolean
+  /** How many `medical/image-observation` records the turn must append. */
+  readonly eventCountDelta?: number
+  /** The records those events must carry, in order. */
+  readonly events?: readonly ImageMutationEventExpectation[]
+}
+
+/** One durable image-observation record an expectation pins. */
+export interface ImageMutationEventExpectation {
+  /** Case-local identity of the image the record must be about. */
+  readonly imageKey: string
+  /** Whether the record first observed the attachment or advanced an existing observation. */
+  readonly operation: 'observe' | 'update'
+  /** The revision the record must carry, when the turn's point is that it advanced. */
+  readonly revision?: number
 }
 
 /**
@@ -221,6 +330,58 @@ export interface ObservedCaseEvent {
   readonly eventSeq: number
 }
 
+/**
+ * One authoritative image observation, projected into the evaluator's
+ * vocabulary.
+ *
+ * The projection is deliberate: the domain value carries the full
+ * `ImageAttachmentRef`, and a report has no business carrying a display name or
+ * intrinsic dimensions that came from the user's file. What survives is what an
+ * assertion can be written about.
+ */
+export interface ObservedImageObservation {
+  /**
+   * Case-local identity the runner resolved this attachment to, or null when
+   * the attachment is not one this case admitted. The domain authorizes every
+   * id against its own session, so null cannot arise from a well-formed run and
+   * is reported rather than hidden.
+   */
+  readonly imageKey: string | null
+  /** Durable attachment id, carried so a failure can be located in the log. */
+  readonly attachmentId: string
+  /** The durable revision. */
+  readonly revision: number
+  /** The recorded body region, or null. */
+  readonly bodyRegion: string | null
+  /** The normalized findings, in recorded order. */
+  readonly findings: readonly string[]
+  /** Whether any part of the image could be described. */
+  readonly usable: boolean
+  /** The normalized quality limitations, in canonical order. */
+  readonly qualityIssues: readonly ImageQualityIssue[]
+  /** The normalized uncertainty list, in recorded order. */
+  readonly uncertainty: readonly string[]
+}
+
+/** One durable image-observation record appended during a turn. */
+export interface ObservedImageEvent {
+  /**
+   * Case-local identity of the image the record is about, or null when the
+   * record names an attachment this case never admitted. That cannot happen in
+   * a well-formed run — the domain authorizes every id against the session —
+   * so a null here is itself a fault the evaluator reports rather than hides.
+   */
+  readonly imageKey: string | null
+  /** Durable attachment id the record carries. */
+  readonly attachmentId: string
+  /** Whether the record first observed the attachment or advanced it. */
+  readonly operation: ImageObservationOperation
+  /** The revision the record carries. */
+  readonly revision: number
+  /** Session sequence of the `medical/image-observation` event. */
+  readonly eventSeq: number
+}
+
 /** Wall-clock span of one turn, read from its own `turn/start` and `turn/end`. */
 export interface ObservedTiming {
   /** Epoch milliseconds of `turn/start`. */
@@ -241,12 +402,12 @@ export interface ObservedRuntimeError {
 
 /**
  * One turn as the runner observed it: a stable, harness-free snapshot of the
- * events this turn produced plus the authoritative case state read from the
- * domain after it settled.
+ * events this turn produced plus the authoritative state read from the domains
+ * after it settled.
  *
- * Nothing here is recomputed from tool arguments. `caseState` is the value the
- * domain derived from the durable log, so the evaluator can never disagree
- * with the runtime about what the case holds.
+ * Nothing here is recomputed from tool arguments. `caseState` and
+ * `imageObservations` are the values the domains derived from the durable log,
+ * so the evaluator can never disagree with the runtime about what is recorded.
  */
 export interface ObservedTurn {
   /** Zero-based position of this turn within its golden case. */
@@ -261,6 +422,13 @@ export interface ObservedTurn {
   readonly caseState: CaseView | null
   /** Durable case records this turn appended, in logged order. */
   readonly caseEvents: readonly ObservedCaseEvent[]
+  /**
+   * The authoritative image observations after the turn, in first-observation
+   * order. Empty when the case has no images or none were observed.
+   */
+  readonly imageObservations: readonly ObservedImageObservation[]
+  /** Durable image-observation records this turn appended, in logged order. */
+  readonly imageEvents: readonly ObservedImageEvent[]
   /** Summed token usage of this turn's model calls, or null when the runtime reported none. */
   readonly usage: TokenUsage | null
   /** Wall-clock span, or null when the turn has no complete boundary pair. */
@@ -279,6 +447,8 @@ export interface EvaluationEvidence {
   readonly toolResultSeqs: readonly number[]
   /** `medical/case-change` sequences considered. */
   readonly caseEventSeqs: readonly number[]
+  /** `medical/image-observation` sequences considered. */
+  readonly imageEventSeqs: readonly number[]
 }
 
 /**
@@ -315,6 +485,8 @@ export interface TurnEvaluation {
   readonly toolCalls: readonly string[]
   /** The authoritative case after the turn. */
   readonly caseState: CaseView | null
+  /** The authoritative image observations after the turn. */
+  readonly imageObservations: readonly ObservedImageObservation[]
   /** Token usage this turn reported, carried so the report can state how much of it was measured. */
   readonly usage: TokenUsage | null
 }
@@ -413,6 +585,16 @@ export interface EvalSummary {
   readonly missingFieldAssertionsPassed: number
   /** Missing-field assertions evaluated. */
   readonly missingFieldAssertionsTotal: number
+  /** Image-observation assertions that held. */
+  readonly imageAssertionsPassed: number
+  /** Image-observation assertions evaluated. */
+  readonly imageAssertionsTotal: number
+  /** Image-mutation assertions that held. */
+  readonly imageMutationAssertionsPassed: number
+  /** Image-mutation assertions evaluated. */
+  readonly imageMutationAssertionsTotal: number
+  /** Turns that appended an image record where the expectation forbade it. */
+  readonly unexpectedImageMutations: number
   /** Tool results that reported an error. */
   readonly toolErrors: number
   /** Turns that mutated the case where the expectation forbade it. */
@@ -461,6 +643,14 @@ export interface CaseReportTurn {
   readonly toolCalls: readonly string[]
   /** The authoritative case after the turn. */
   readonly caseState: CaseView | null
+  /**
+   * The authoritative image observations after the turn.
+   *
+   * Deliberately the projected observation and not the domain value: a report
+   * quotes what an assertion can be written about, never image bytes, a fixture
+   * path, or an attachment storage location.
+   */
+  readonly imageObservations: readonly ObservedImageObservation[]
 }
 
 /**
@@ -472,7 +662,7 @@ export interface CaseReportTurn {
  */
 export interface EvalReport {
   /** Contract version of this document. */
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   /** Identity of this run, unique within the directory it is written to. */
   readonly runId: string
   /** ISO 8601 start instant. */

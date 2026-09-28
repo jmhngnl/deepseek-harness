@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Golden-case evaluation for the medical intake agent: versioned statements of what a consultation must do, replayed through the real agent loop against a scripted or a live model. An outcome is judged against the authoritative case state the runtime derived, never against the assistant's prose. A pure evaluator turns each turn into evaluated assertions and a report counts every dimension on its own rather than collapsing a run into a score. It is test infrastructure: it registers no tool and publishes no service, so the medical agent's model-facing surface stays at five tools.
+Golden-case evaluation for the medical intake agent: versioned statements of what a consultation must do, replayed through the real agent loop against a scripted or a live model. An outcome is judged against the authoritative state the runtime derived — the reported case and the model's image observations — never against the assistant's prose. A pure evaluator turns each turn into evaluated assertions and a report counts every dimension on its own rather than collapsing a run into a score. It is test infrastructure: it registers no tool and publishes no service.
 
 ## Table of Contents
 
@@ -58,10 +58,15 @@ const report = buildReport({ runId, startedAt, finishedAt, runtime, runs })
 ### Running the live smoke
 
 ```sh
-pnpm medharness:eval                                    # the three-case smoke
+pnpm medharness:eval                                    # the three-case text smoke
 pnpm medharness:eval --case get-reads-without-changing   # one named case
-pnpm medharness:eval --all                               # the whole roster
+pnpm medharness:eval --case image-live-smoke-visible-patch  # the one image smoke
+pnpm medharness:eval --all                               # the whole roster, images included
 ```
+
+The default smoke stays text-only on purpose: it is cheap and stable, and adding a vision call to every ordinary run would spend image tokens on a regression that does not exercise them. The image smoke is one named case, so it costs one request and is asked for explicitly.
+
+A case that attaches images is checked before its first request: the route the composition resolved must accept image input. The harness projects every image to placeholder text for a route that declares its modalities and omits `image`, so without that check a text-only route would not fail — the run would quietly measure a text smoke while reporting a vision one. A route that declares no modalities proceeds, because an absent declaration is "unknown" rather than "text only" and the request still carries the image.
 
 `runLiveEval` boots the shipped `medharness` profile through the app-boot loader — the real profile directory, the real bundle layers, the real healed module fallback the `dsh` launcher uses — and mounts nothing of its own, so a benchmark measures the composition that ships rather than a re-mounting of it. Two subtractions are deliberate and named in the source: the `@deepseek-ai/dsh-headless` one-shot CLI rows are excluded, because they would drive a task of their own, and the profile's user layers are skipped, so a machine-local patch cannot redefine what "the shipped profile" means. Skipping the patch layer is not enough on its own: `app-boot` normalizes a profile manifest only while its `dsh.profile.bundles` still equals the shipped template, and treats any other list as user-owned, so a hand-edited `package.json` would otherwise be booted and still be reported as shipped. The run therefore asserts that the loaded profile composes exactly the shipped bundles and refuses to measure one that does not — it refuses rather than repairs, leaving a rejected profile exactly as it found it. The report states the route the booted composition resolved, every case in a run must resolve that same route or no report is written at all, and the run refuses a composition that published anything but the five medical tools.
 
@@ -126,23 +131,70 @@ Every case replays into a fresh session and states its own history. A case that 
 | `caseState.symptoms` / `duration` / `age` / `additionalNotes` | The authoritative record |
 | `caseState.revision` | The durable revision |
 | `caseState.missingFields` | The derived gap report |
-| `mutation.changed` / `eventCountDelta` / `operations` | What the turn did to the log |
+| `mutation.changed` / `eventCountDelta` / `operations` | What the turn did to the case log |
+| `imageObservations[].imageKey` | Which attached image the expectation is about — **required** |
+| `imageObservations[].bodyRegion` / `findings` / `usable` / `qualityIssues` / `uncertainty` | The authoritative observation |
+| `imageObservations[].minimumFindings` | A lower bound on the finding count, for an expectation that must not fix the wording |
+| `imageObservations[].revision` | The observation's durable revision |
+| `imageMutation.changed` / `eventCountDelta` / `events` | What the turn did to the image log |
 
 Two policies keep the roster honest rather than brittle:
 
 - **Arguments are pinned only where extraction is the point.** They are absent wherever two spellings of the same correct call produce the same record, so a case never fails for a reason other than the one it names.
 - **A free-text value is pinned only where it is unambiguous** — the roster never pins a `duration` literal. Once the user has supplied a duration, its wording has several equivalent spellings, so such a case pins `missingFields: []` instead: that is the proof the duration was recorded. The literal `duration: null` appears only where the user supplied none, and there it is the proof that nothing was invented. What the model writes into a free-text field is a data point about its phrasing, not a contract.
+- **`findings` and `minimumFindings` are mutually exclusive.** A scripted case can pin the exact list because its model is a script; a live case pins only that the observer found something, because a real observer's phrasing is not reproducible. `findings` + `minimumFindings` in one expectation is a contract error, not a precedence rule.
 
+### Attached images
+
+A turn attaches synthetic images by registry id:
+
+```json
+{
+  "user": "请看一下我拍的照片",
+  "images": [{ "key": "image-1", "fixture": "synthetic-visible-patch" }],
+  "expect": {
+    "toolRouting": { "kind": "exact", "calls": [{ "name": "medical_image_observe" }] },
+    "imageObservations": [{ "imageKey": "image-1", "revision": 1, "usable": true, "minimumFindings": 1 }],
+    "imageMutation": {
+      "changed": true,
+      "eventCountDelta": 1,
+      "events": [{ "imageKey": "image-1", "operation": "observe", "revision": 1 }]
+    }
+  }
+}
+```
+
+A case never holds bytes, a path, or an attachment id. `fixture` is resolved through the closed registry in [`src/fixtures.ts`](src/fixtures.ts), and the loader refuses an id the registry does not hold — so benchmark data cannot become a filesystem-read contract, and the fixture directory can move without rewriting a case. Every fixture is a synthetic raster this repository generated; see [`fixtures/images/README.md`](fixtures/images/README.md).
+
+The runner then takes the real path:
+
+```
+fixture bytes → ctx.attachments.admitPromptContent → canonical ImageAttachmentRef
+  → ImageBlock → createUserMessage → agent.followup
+```
+
+It never mints an id, hashes bytes, or guesses a dimension: admission is the only thing that produces a reference, so an image case exercises the integration rather than a description of it. `key` is evaluation metadata and nothing more — the domain has no idea it exists. It is how a case and an expectation name an image without pinning the digest admission minted, and it is what the observer resolves an attachment id back to.
+
+The expectation for a live case pins structure rather than prose: the observation exists for the right image, is usable, is at revision one, and records at least one finding. That is not a lowered standard — it is the structural half of the assertion, separated from the half that depends on how a particular model happens to phrase a sentence.
+
+<a id="the-failure-taxonomy"></a>
 ### The failure taxonomy
 
-Failure Taxonomy **v1**, in [`src/types.ts`](src/types.ts). It is the clustering key a future bad-case collector groups by, so a new member is a contract change: raise the schema versions with it rather than reusing a name for a new meaning. It is not frozen — versioned.
+Failure Taxonomy **v2**, in [`src/types.ts`](src/types.ts). It is the clustering key a future bad-case collector groups by, so a new member is a contract change: raise the schema versions with it rather than reusing a name for a new meaning. It is not frozen — versioned.
 
-`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` · `ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` · `REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` · `CASE_ID_CHANGED` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
+`TOOL_NOT_CALLED` · `WRONG_TOOL` · `EXTRA_TOOL_CALL` · `TOOL_ERROR` · `ARGUMENT_EXTRACTION_ERROR` · `CASE_STATE_MISMATCH` · `MISSING_FIELDS_MISMATCH` · `REVISION_MISMATCH` · `UNEXPECTED_CASE_MUTATION` · `EXPECTED_MUTATION_MISSING` · `CASE_ID_CHANGED` · `IMAGE_OBSERVATION_MISMATCH` · `IMAGE_REVISION_MISMATCH` · `UNEXPECTED_IMAGE_MUTATION` · `EXPECTED_IMAGE_MUTATION_MISSING` · `SESSION_TIMEOUT` · `RUNTIME_ERROR`
 
-Two rules keep the classification meaningful:
+The image members are deliberately four. A missing or wrong image tool call is already `TOOL_NOT_CALLED` / `WRONG_TOOL`, and a bad pinned argument is already `ARGUMENT_EXTRACTION_ERROR`; only the image domain's own subjects — the authoritative observation, its revision, and the durable records — need names of their own.
+
+Three rules keep the classification meaningful:
 
 - An argument fault is reported **only** for a value an expectation pinned. Without one there is no ground truth about what the model extracted, so a case-state difference stays a `CASE_STATE_MISMATCH` rather than a guess.
 - `caseId`, `createdAt`, and `updatedAt` have no deterministic value, so what is asserted is their **continuity**: a later revision keeping an earlier one's identity, and the mutation clock never stepping backwards. A violation of either is a case-state mismatch, because that is the state a reader should look at.
+- An expectation naming an image the session holds no observation for fails **once**, on that image, rather than producing one failure per pinned field. One root cause produces one failure.
+
+### What the taxonomy deliberately does not classify
+
+There is no assistant-prose classification, and there will not be one here. Deciding whether a reply diagnosed a condition needs a semantic judgement, and no deterministic classifier this package can own would make it: a keyword scan for disease names would be fragile, wrong in both directions, and would dress a heuristic up as a safety measurement. The persona's no-diagnosis boundary is enforced where it belongs — in the prompt and in the tool contract, which has no field for a clinical conclusion — and a safety evaluation that needs a semantic judgement should be designed as one, with a structured policy evaluator or an external judge, rather than folded into a deterministic benchmark.
 
 ### The evaluator is pure
 
@@ -156,6 +208,9 @@ summary: {
   toolRoutingPassed, toolRoutingTotal,          // per turn
   stateAssertionsPassed, stateAssertionsTotal,  // per assertion
   missingFieldAssertionsPassed, missingFieldAssertionsTotal,
+  imageAssertionsPassed, imageAssertionsTotal,  // per assertion
+  imageMutationAssertionsPassed, imageMutationAssertionsTotal,
+  unexpectedImageMutations,
   toolErrors, unexpectedMutations, timeouts, runtimeErrors,
   passRate,
   usage: { inputTokens, outputTokens, observedTurns, totalTurns, complete },
@@ -163,10 +218,13 @@ summary: {
 }
 ```
 
-A single weighted number would have to be agreed before there is data to agree it against, and its dimensions are not interchangeable. Two rules follow:
+A single weighted number would have to be agreed before there is data to agree it against, and its dimensions are not interchangeable. Three rules follow:
 
 - Routing is counted **per turn**, so the denominator is the turn count however the model behaved. A turn that faulted produced no routing assertion to pass, so it counts against the ratio rather than for it.
 - Usage carries its own coverage. Sums over the turns that reported usage travel with the count, so a partially measured run reads as incomplete rather than as cheap. Nothing here estimates tokens: `length / 4` is not usage.
+- Patient-reported state and model-observed evidence stay **separate dimensions**, for the same reason they are separate domains. A run whose case is perfect and whose image observations are wrong must not average into one number that hides which half failed.
+
+The report carries the authoritative image observations per turn, projected: `imageKey`, `revision`, `bodyRegion`, `findings`, `usable`, `qualityIssues`, `uncertainty`, and the attachment id. It never carries image bytes, base64, a fixture path, or an attachment storage location — a test asserts that.
 
 ### Turn boundaries
 
@@ -218,6 +276,10 @@ None; the evaluator walks plain data and the runner drives an existing loop.
 - **No weighted score, and no promotion gate** — the report states dimensions and a raw pass rate. Turning those into a merge gate is a decision for a phase that has data to base it on.
 - **Observations are not persisted** — a run writes its report, not the snapshots it was computed from, so a report cannot be re-evaluated without replaying the case. Persisting observations is what would let a case be re-judged after the evaluator changes.
 - **Nothing is clustered yet** — the taxonomy is defined and carried on every failure, but nothing groups failures across runs into bad-case families. That is the collector's job.
+- **Image fixtures are three synthetic rasters** — a disc, a square, and an unresolvable field. They measure the observation pipeline's structure, not a model's clinical vision: a case can assert that an observer described a shape, and nothing here claims it could describe a rash.
+- **No assistant-prose safety classification** — deciding whether a reply diagnosed something needs a semantic judgement this package cannot make deterministically. See [What the taxonomy deliberately does not classify](#the-failure-taxonomy).
+- **The live image smoke asserts structure, not phrasing** — it pins that the observation exists, is usable, is at revision one, and records at least one finding. A live run that reports a phrasing difference is reporting a fact about the model, and the case is written so it does not fail for one.
+- **The live smoke spends image tokens only when asked** — the default invocation stays text-only, so an ordinary regression run does not pay for a vision request. `--all` includes the image cases, because a full benchmark was explicitly requested.
 
 <a id="dev-note"></a>
 ### Dev Note

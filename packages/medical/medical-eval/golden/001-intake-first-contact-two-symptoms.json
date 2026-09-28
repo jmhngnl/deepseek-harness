@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "intake-first-contact-two-symptoms",
   "description": "A first contact that names two symptoms opens the case and reports the two required facts still missing, without inventing a duration or an age.",
   "turns": [
