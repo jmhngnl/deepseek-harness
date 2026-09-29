@@ -42,11 +42,13 @@ const CODING_TOOLS = ['bash', 'pwsh', 'read', 'write', 'edit', 'glob', 'grep', '
 
 /**
  * A generous ceiling. The three-tool surface measured ~1,133 tokens; the
- * five-tool surface Phase 4A adds measures ~2,100, because the image tools carry
+ * five-tool surface Phase 4A adds measures ~2,174, because the image tools carry
  * the visible-evidence boundary in their own descriptions — that is where a model
- * reads it, immediately before calling them. The ceiling leaves roughly a quarter
- * of headroom for wording edits while still catching a row that widens the
- * request without anyone deciding to.
+ * reads it, immediately before calling them. Phase 4B.1 spent ~74 of those on
+ * `medical_image_observe`'s attachmentId description, which now names the exact
+ * string a model must copy. The ceiling leaves roughly a fifth of headroom for
+ * wording edits while still catching a row that widens the request without anyone
+ * deciding to.
  */
 const TOKEN_BUDGET = 2600
 

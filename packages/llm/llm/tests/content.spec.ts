@@ -156,11 +156,81 @@ describe('model-facing image access', () => {
       hasAlpha: true,
     }
     expect(requestImageHandleText(attachment, version, access)).toBe(
-      `Image "source \\"map\\".png" (${attachment.attachmentId}); request preview 923x692px.`
+      `Image: attachmentId="${attachment.attachmentId}"; displayName="source \\"map\\".png" (display only); request preview 923x692px.`
       + ' Normalized copy (read-only; may be resized or re-encoded): "/tmp/.dsh/attachments/v1/objects/bb/object" (2048x1536px, image/png).'
       + ' Source dimensions, format, and byte size may differ.'
       + ' Copy to a writable path ending in .png before editing.',
     )
+  })
+
+  it('names the attachment id as a field, complete with its prefix, when a display name is present', () => {
+    const attachment = image(1).attachment
+    const version = {
+      variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
+      attachment,
+      data: Uint8Array.of(1),
+      mediaType: 'image/png' as const,
+      bytes: 1,
+      width: 64,
+      height: 64,
+      depth: 'uchar' as const,
+      space: 'srgb' as const,
+      hasAlpha: true,
+    }
+    const text = requestImageHandleText({ ...attachment, name: 'photo.png' }, version)
+
+    // A tool that takes an attachment id needs one exact string to copy, so the
+    // id is a labelled field, quoted, and carrying the prefix it is stored under.
+    expect(text).toContain(`attachmentId="${String(attachment.attachmentId)}"`)
+    expect(text).toContain('sha256:')
+    expect(text).toContain('displayName="photo.png" (display only)')
+    // The display name is not the identity: the handle must not read as if it were.
+    expect(text.indexOf('attachmentId=')).toBeLessThan(text.indexOf('displayName='))
+  })
+
+  it('names the attachment id just as clearly when there is no display name', () => {
+    const attachment = image(1).attachment
+    const version = {
+      variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
+      attachment,
+      data: Uint8Array.of(1),
+      mediaType: 'image/png' as const,
+      bytes: 1,
+      width: 64,
+      height: 64,
+      depth: 'uchar' as const,
+      space: 'srgb' as const,
+      hasAlpha: true,
+    }
+    const text = requestImageHandleText(attachment, version)
+
+    // `image()` carries no name, so the handle is the identity alone — which is
+    // the case where an unlabelled id was easiest to mistake for something else.
+    expect(attachment.name).toBeUndefined()
+    expect(text).toContain(`attachmentId="${String(attachment.attachmentId)}"`)
+    expect(text).toContain('sha256:')
+    expect(text).not.toContain('displayName')
+  })
+
+  it('never abbreviates the digest, so the model cannot copy a prefix of it', () => {
+    const attachment = image(1).attachment
+    const version = {
+      variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
+      attachment,
+      data: Uint8Array.of(1),
+      mediaType: 'image/png' as const,
+      bytes: 1,
+      width: 64,
+      height: 64,
+      depth: 'uchar' as const,
+      space: 'srgb' as const,
+      hasAlpha: true,
+    }
+    const digest = String(attachment.attachmentId).slice('sha256:'.length)
+
+    expect(requestImageHandleText(attachment, version)).toContain(digest)
+    // `textOnlyImageText` truncates on purpose; the request handle must not.
+    expect(requestImageHandleText(attachment, version)).not.toContain(`sha256:${digest.slice(0, 8)}]`)
   })
 
   it('bridges a provider host object only through the mounted filesystem mapping', () => {

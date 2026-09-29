@@ -105,6 +105,28 @@ describe('medical_image_observe registration and schema', () => {
     }
   })
 
+  it('tells the model exactly which string the attachmentId must be', async () => {
+    const { ctx } = await setup()
+    const schema = ctx.tools.schemas().find(tool => tool.name === 'medical_image_observe')
+    const properties = (schema?.parameters as { properties?: Record<string, { description?: string }> })
+      .properties ?? {}
+    const description = properties.attachmentId?.description ?? ''
+
+    // The live failure this guards: the model answered with the display name,
+    // with the digest minus its "sha256:" prefix, and with a filesystem path,
+    // and every one of those was correctly refused as not in this session.
+    expect(description).toContain('verbatim')
+    expect(description).toContain('including its "sha256:" prefix')
+    expect(description).toContain('NOT the')
+    expect(description).toContain('display name')
+    expect(description).toContain('file name')
+    expect(description).toContain('prefix removed')
+    expect(description).toContain('file path')
+    expect(description).toContain('image position')
+    expect(description).toContain('must not be shortened')
+    expect(description).toContain('not attached to this session is rejected')
+  })
+
   it('requires EVERY field of the snapshot', async () => {
     const { ctx } = await setup()
     const schema = ctx.tools.schemas().find(tool => tool.name === 'medical_image_observe')

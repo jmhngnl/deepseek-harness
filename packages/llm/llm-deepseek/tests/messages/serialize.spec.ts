@@ -1,6 +1,6 @@
 /** Request conversion and durable replay validation. */
 import { describe, expect, it, vi } from 'vitest'
-import { createAssistantMessage, createMessage, createSystemMessage, createToolResultMessage, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createMessage, createSystemMessage, createToolResultMessage, createUserMessage, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentStore, ImageAttachmentRef, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
@@ -288,6 +288,33 @@ describe('Messages images', () => {
     expect(() => inlineImages(exact.messages, exact.versions, config)).toThrow(expect.objectContaining({
       failure: expect.objectContaining({ code: 'IMAGE_OFFLOAD_REQUIRED', offloadImages: 1 }) as unknown,
     }))
+  })
+  it('sends the canonical attachmentId handle beside a real image part', () => {
+    const named: ImageAttachmentRef = { ...ref, name: 'photo.png' }
+    const message = createUserMessage({
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'look' }, { type: 'image', attachment: named }],
+    })
+    const wire = serialize(
+      options({ messages: [message] }), connection, [message],
+      new Map([[named.attachmentId, { ...version, attachment: named }]]), access,
+    )
+
+    const carrying = (wire.messages ?? []).find(entry => entry.content.some(block => block.type === 'image'))
+    const blocks = carrying?.content ?? []
+    // The image is really sent, and the handle beside it names the id as a field.
+    expect(blocks.map(block => block.type)).toEqual(['text', 'text', 'image'])
+    expect(blocks.at(-1)).toMatchObject({ type: 'image', source: { type: 'base64', media_type: 'image/png' } })
+    const handle = blocks.find(block => block.type === 'text' && block.text.startsWith('Image: '))
+    expect(handle).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining(`attachmentId="${String(named.attachmentId)}"`) as string,
+    })
+    const text = (handle as { text: string }).text
+    expect(text).toContain('sha256:')
+    // The display name is present but labelled as display-only, and never first.
+    expect(text).toContain('displayName="photo.png" (display only)')
+    expect(text.indexOf('attachmentId=')).toBeLessThan(text.indexOf('displayName='))
   })
   it('rejects unsupported roles and unavailable image capabilities before HTTP', async () => {
     const history = [result('a', [image])]

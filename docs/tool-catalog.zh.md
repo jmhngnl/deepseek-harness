@@ -1766,7 +1766,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
   "properties": {
     "attachmentId": {
       "type": "string",
-      "description": "The attachment id shown beside the image in this conversation. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
+      "description": "The attachmentId of the image, copied verbatim from the image handle in this conversation: the full value inside attachmentId=\"...\" exactly as written, including its \"sha256:\" prefix. It is NOT the display name, the file name, a digest with the prefix removed, a file path, or the image position, and it must not be shortened, recomputed, or rewritten. An id that was not attached to this session is rejected, and the harness uses its own record of the image rather than any detail you send."
     },
     "bodyRegion": {
       "oneOf": [

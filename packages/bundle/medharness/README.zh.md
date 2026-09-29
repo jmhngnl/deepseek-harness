@@ -86,7 +86,7 @@ dsh --profile medharness-web
 
 #### Token 影响
 
-一段稳定的人设加五个工具 schema —— 实测 8,384 字节，约 2,100 tokens；同一 Agent 跑在 `dsh-base` 之上时为 29,612 字节、约 7,403 tokens。会话历史与工具结果随会话增长，与其他 profile 一致。
+一段稳定的人设加五个工具 schema —— 实测 8,696 字节，约 2,174 tokens；同一 Agent 跑在 `dsh-base` 之上时为 29,612 字节、约 7,403 tokens。会话历史与工具结果随会话增长，与其他 profile 一致。
 
 #### KV Cache 影响
 

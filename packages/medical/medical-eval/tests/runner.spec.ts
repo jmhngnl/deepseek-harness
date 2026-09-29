@@ -496,6 +496,24 @@ describe('the image a golden case attaches', () => {
     expect(carrying[0]?.content[0]).toEqual({ type: 'text', text: '我拍了一张照片，你看看' })
   })
 
+  it('gives each fixture a neutral display name, so the name cannot hint at the content', async () => {
+    const { adapter } = await replayOne('image-observe-single-usable', SCRIPTS['image-observe-single-usable'] ?? [])
+
+    const [block] = requestImageBlocks(adapter.requests[0] as GenerateOptions)
+    // The display name is positional, not descriptive: an observation case must
+    // be decided on what the model can see, not on what the file is called.
+    expect(block?.attachment.name).toBe('image-1.png')
+    expect(block?.attachment.name).not.toContain('synthetic')
+    expect(block?.attachment.name).not.toContain('visible-patch')
+  })
+
+  it('numbers two images rather than naming them after their fixtures', async () => {
+    const { adapter } = await replayOne('image-observe-two-images', SCRIPTS['image-observe-two-images'] ?? [])
+
+    const blocks = requestImageBlocks(adapter.requests[0] as GenerateOptions)
+    expect(blocks.map(block => block.attachment.name)).toEqual(['image-1.png', 'image-2.png'])
+  })
+
   it('resolves the golden image key to the attachment admission minted', async () => {
     const { run, adapter } = await replayOne(
       'image-observe-restatement-is-a-noop',

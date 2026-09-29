@@ -82,6 +82,15 @@ export function textOnlyImageText(ref: ImageAttachmentRef): string {
  * the occurrence's own durable reference: request versions are prepared per
  * attachment id, so one shared version may serve occurrences whose display
  * names differ.
+ *
+ * The attachment id is written as an explicitly named field, quoted and carrying
+ * its `sha256:` prefix, because a tool that takes an attachment id needs the
+ * model to copy one exact string. Naming it next to an unlabelled display name
+ * alone was not enough: models answered with the display name, with the digest
+ * minus its prefix, and with the normalized-copy path — all of which the
+ * session authorization then rejected. The id leads, the name is labelled as
+ * display-only, and the rest of the handle keeps its original wording so no
+ * other projection path changes.
  * @param ref - the occurrence's durable normalized attachment.
  * @param version - exact request-image dimensions shown beside the text.
  * @param access - optional path resolved for the current tool execution world.
@@ -92,7 +101,9 @@ export function requestImageHandleText(
   version: Pick<RequestImageAttachment, 'width' | 'height'>,
   access?: ImageAttachmentAccess,
 ): string {
-  const preview = `Image ${imageIdentity(ref)}; request preview ${version.width}x${version.height}px.`
+  const identity = `attachmentId=${quoted(String(ref.attachmentId))}`
+  const name = ref.name === undefined ? '' : ` displayName=${quoted(ref.name)} (display only);`
+  const preview = `Image: ${identity};${name} request preview ${version.width}x${version.height}px.`
   return access === undefined
     ? `${preview} It may be resized or re-encoded; source dimensions, format, and byte size may differ.`
     : preview + normalizedAccessText(ref, access)

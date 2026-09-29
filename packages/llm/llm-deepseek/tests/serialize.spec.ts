@@ -384,7 +384,7 @@ describe('image serialization', () => {
       role: 'user',
       content: [
         { type: 'text', text: 'before' },
-        { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}; request preview 1x1px`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${ref.attachmentId}"; request preview 1x1px`) as string },
         { type: 'file', file_id: 'file-api-image' },
         { type: 'text', text: 'after' },
       ],
@@ -409,7 +409,7 @@ describe('image serialization', () => {
     expect(wire.messages).toEqual([{
       role: 'user',
       content: [
-        { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}; request preview 1x1px`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${ref.attachmentId}"; request preview 1x1px`) as string },
         { type: 'image_url', image_url: { url } },
       ],
     }])
@@ -430,11 +430,37 @@ describe('image serialization', () => {
       content: [
         {
           type: 'text',
-          text: `Image ${ref.attachmentId}; request preview 1x1px. It may be resized or re-encoded; source dimensions, format, and byte size may differ.`,
+          text: `Image: attachmentId="${ref.attachmentId}"; request preview 1x1px. It may be resized or re-encoded; source dimensions, format, and byte size may differ.`,
         },
         { type: 'file', file_id: 'file-api-image' },
       ],
     }])
+  })
+
+  it('sends the canonical attachmentId handle beside the image part', async () => {
+    const ref = { ...imageRef(), name: 'photo.png' }
+    const wire = await serializeRequestWithImages(request({
+      model: 'deepseek-v4-flash-vision-exp',
+      messages: [createUserMessage({
+        content: [{ type: 'image', attachment: ref }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    }), imageOptions([ref]))
+
+    const content = wire.messages[0]?.content
+    if (content === null || content === undefined || typeof content === 'string') {
+      throw new Error('expected structured content')
+    }
+    // A real image part travels with the handle; the handle names the id first.
+    expect(content.map(block => block.type)).toEqual(['text', 'file'])
+    const text = (content[0] as { text: string }).text
+    expect(text.startsWith('Image: attachmentId=')).toBe(true)
+    expect(text).toContain(`attachmentId="${String(ref.attachmentId)}"`)
+    expect(text).toContain('sha256:')
+    expect(text).toContain('displayName="photo.png" (display only)')
+    expect(text.indexOf('attachmentId=')).toBeLessThan(text.indexOf('displayName='))
+    // The id is complete, not the eight-character digest a text-only placeholder carries.
+    expect(text).not.toContain(`sha256:${String(ref.attachmentId).slice('sha256:'.length, 'sha256:'.length + 8)}"`)
   })
 
   it('includes provider-resolved normalized access in a retained image handle', async () => {
@@ -456,7 +482,7 @@ describe('image serialization', () => {
       role: 'user',
       content: [{
         type: 'text',
-        text: expect.stringContaining('Image "diagram.png"') as string,
+        text: expect.stringContaining('displayName="diagram.png"') as string,
       }, { type: 'file' }],
     })
     expect(JSON.stringify(wire.messages[0])).toContain('/tmp/dsh/objects/aa/object')
@@ -503,12 +529,12 @@ describe('image serialization', () => {
       {
         role: 'tool',
         tool_call_id: 'first',
-        content: expect.stringContaining(`Image ${png.attachmentId}`) as string,
+        content: expect.stringContaining(`Image: attachmentId="${png.attachmentId}"`) as string,
       },
       {
         role: 'tool',
         tool_call_id: 'second',
-        content: expect.stringContaining(`caption\nImage ${jpeg.attachmentId}`) as string,
+        content: expect.stringContaining(`caption\nImage: attachmentId="${jpeg.attachmentId}"`) as string,
       },
       {
         role: 'user',
@@ -632,7 +658,7 @@ describe('image serialization', () => {
           type: 'text',
           text: expect.stringContaining(`image omitted to fit request image limits; ${png.attachmentId}. Normalized copy (read-only; may be resized or re-encoded): "/tmp/dsh/objects/png"`) as string,
         },
-        { type: 'text', text: expect.stringContaining(`Image ${jpeg.attachmentId}`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${jpeg.attachmentId}"`) as string },
         { type: 'file', file_id: 'file-api-image' },
       ],
     })

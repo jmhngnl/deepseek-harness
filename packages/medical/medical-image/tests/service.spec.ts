@@ -104,6 +104,34 @@ describe('attachment authorization', () => {
     expect(eventsOfType(agent, 'medical/image-observation')).toEqual([])
   })
 
+  it('refuses a near-miss identity: the display name, a bare digest, or a storage path', async () => {
+    const { ctx, agent } = await setup()
+    attach(agent, RASH)
+    const canonical = String(RASH.attachmentId)
+    const digest = canonical.slice('sha256:'.length)
+
+    // The shapes a live model answered with before the request handle named the
+    // id as a field. None may be accepted, normalized, or repaired into the real
+    // one: accepting any of them would make attachment identity guessable.
+    const nearMisses: readonly [label: string, candidate: string][] = [
+      ['the display name', 'a.png'],
+      ['the display name without its extension', 'a'],
+      ['a bare digest', digest],
+      ['a digest with the wrong prefix', `md5:${digest}`],
+      ['a truncated digest', `sha256:${digest.slice(0, 32)}`],
+      ['a filesystem path', `C:\\Users\\someone\\.dsh\\attachments\\v1\\objects\\${digest.slice(0, 2)}\\${digest}`],
+    ]
+    for (const [label, candidate] of nearMisses) {
+      expect(() => ctx.medicalImage.observe(agent, observation(candidate)), label)
+        .toThrow(/no user image with attachment/)
+    }
+    expect(eventsOfType(agent, 'medical/image-observation')).toEqual([])
+
+    // The canonical id still works, so the refusals above are about the identity
+    // and not about the session having lost the image.
+    expect(ctx.medicalImage.observe(agent, observation(canonical)).changed).toBe(true)
+  })
+
   it('refuses an attachment that belongs to a different session, with the same answer', async () => {
     const first = await setup('session-a')
     const second = await setup('session-b')

@@ -154,7 +154,7 @@ describe('pi-ai request context conversion', () => {
       {
         role: 'user',
         content: [
-          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+          { type: 'text', text: expect.stringContaining(`Image: attachmentId="${ref.attachmentId}"`) as string },
           { type: 'image', data: 'AQ==', mimeType: 'image/png' },
           { type: 'text', text: 'caption' },
         ],
@@ -173,7 +173,7 @@ describe('pi-ai request context conversion', () => {
         toolCallId: 'missing-call',
         toolName: 'unknown',
         content: [
-          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+          { type: 'text', text: expect.stringContaining(`Image: attachmentId="${ref.attachmentId}"`) as string },
           { type: 'image', data: 'AQ==', mimeType: 'image/png' },
         ],
         isError: true,
@@ -195,7 +195,7 @@ describe('pi-ai request context conversion', () => {
     expect(context.messages[0]).toMatchObject({
       role: 'user',
       content: [
-        { type: 'text', text: expect.stringContaining('Image "chart.png"') as string },
+        { type: 'text', text: expect.stringContaining('displayName="chart.png"') as string },
         { type: 'image' },
       ],
     })
@@ -228,7 +228,7 @@ describe('pi-ai request context conversion', () => {
       toolName: 'unknown',
       content: [
         { type: 'text', text: 'nested text' },
-        { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${ref.attachmentId}"`) as string },
         { type: 'image', data: 'AQ==', mimeType: 'image/png' },
       ],
       isError: false,
@@ -288,7 +288,7 @@ describe('pi-ai request context conversion', () => {
       {
         role: 'user',
         content: [
-          { type: 'text', text: expect.stringContaining(`Image ${sized.attachmentId}`) as string },
+          { type: 'text', text: expect.stringContaining(`Image: attachmentId="${sized.attachmentId}"`) as string },
           { type: 'image', data: 'AQID', mimeType: 'image/png' },
           { type: 'text', text: 'newer' },
         ],
@@ -297,7 +297,7 @@ describe('pi-ai request context conversion', () => {
       {
         role: 'user',
         content: [
-          { type: 'text', text: expect.stringContaining(`Image ${sized.attachmentId}`) as string },
+          { type: 'text', text: expect.stringContaining(`Image: attachmentId="${sized.attachmentId}"`) as string },
           { type: 'image', data: 'AQID', mimeType: 'image/png' },
         ],
         timestamp: 0,
@@ -409,7 +409,7 @@ describe('pi-ai request context conversion', () => {
       role: 'user',
       content: [
         { type: 'text', text: offloadedImageText(sized) },
-        { type: 'text', text: expect.stringContaining(`Image ${sized.attachmentId}`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${sized.attachmentId}"`) as string },
         { type: 'image', data: 'AQID', mimeType: 'image/png' },
       ],
       timestamp: 0,

@@ -86,7 +86,7 @@ A persona stating that the agent records facts, asks for what is missing, and ne
 
 #### Token effect
 
-A stable persona plus five tool schemas — measured at 8,384 bytes, about 2,100 tokens, against 29,612 bytes (about 7,403 tokens) for the same agent over `dsh-base`. Conversation history and tool results grow with the session, as everywhere else.
+A stable persona plus five tool schemas — measured at 8,696 bytes, about 2,174 tokens, against 29,612 bytes (about 7,403 tokens) for the same agent over `dsh-base`. Conversation history and tool results grow with the session, as everywhere else.
 
 #### KV Cache effect
 

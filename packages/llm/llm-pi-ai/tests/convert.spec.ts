@@ -126,7 +126,7 @@ describe('toPiContext', () => {
       role: 'user',
       content: [
         { type: 'text', text: 'describe' },
-        { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${attachment.attachmentId}"`) as string },
         { type: 'image', data: 'AQID', mimeType: 'image/png' },
       ],
       timestamp: 0,
@@ -176,7 +176,7 @@ describe('toPiContext', () => {
       content: [
         { type: 'text', text: 'before' },
         { type: 'text', text: 'middle' },
-        { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
+        { type: 'text', text: expect.stringContaining(`Image: attachmentId="${attachment.attachmentId}"`) as string },
         { type: 'image', data: 'AQID', mimeType: 'image/png' },
         { type: 'text', text: 'after' },
       ],

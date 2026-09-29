@@ -153,13 +153,16 @@ async function turnContent(
       + ' a case with images needs the composition that serves them',
     )
   }
-  for (const image of images) {
+  for (const [position, image] of images.entries()) {
     const fixture = loadImageFixture(image.fixture)
     const [part] = await attachments.admitPromptContent([{
       type: 'image',
       mediaType: fixture.mediaType,
       data: Buffer.from(fixture.bytes).toString('base64'),
-      name: `${fixture.id}.png`,
+      // Deliberately neutral. The fixture id is a registry id, not a description,
+      // and naming the file after it would hand the model a hint about what the
+      // image shows — which is exactly what an observation case must not rely on.
+      name: `image-${String(position + 1)}.png`,
     }])
     /* v8 ignore next -- admission returns one part per submitted part by contract */
     if (part === undefined || part.type !== 'image') {
