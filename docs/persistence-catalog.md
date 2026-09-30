@@ -44,6 +44,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:llm/retry` | event | `525254db03b1d1e6b74cf55aced52817568331ac1f96c0818728910b6692e336` | [`event:llm/retry`](#persistence-type-eventllmretry) |
 | `event:llm/retry-started` | event | `48e5c9861f16ac07e78cb7b5ae9dabdf7bb85c58baed5a51b4ad275050ea58e3` | [`event:llm/retry-started`](#persistence-type-eventllmretry-started) |
 | `event:medical/case-change` | event | `cc1bde316381efe4554dc83dcce118451d9b74c254575f59c44199db9c22e425` | [`event:medical/case-change`](#persistence-type-eventmedicalcase-change) |
+| `event:medical/image-observation` | event | `a8318eb9a0a93699fc056e1a4646d05e65739e21228b9e6436d849c74f581f4f` | [`event:medical/image-observation`](#persistence-type-eventmedicalimage-observation) |
 | `event:model/selection` | event | `35203ba7ad5ef6f97d556b85df20ae98f04f09c65748cecdf8eefdb8b6405ffc` | [`event:model/selection`](#persistence-type-eventmodelselection) |
 | `event:permission/preset` | event | `5c45bf4c544a7211dcd8ba6ba7e5f1bc39b49e7a9df9d5cbdc8e87c22771b37b` | [`event:permission/preset`](#persistence-type-eventpermissionpreset) |
 | `event:plan/mode` | event | `a7cf43ce7c2a4c038feed1885cd7a00d5c6ee2d90a7e0d56b46f78a3e1ca327f` | [`event:plan/mode`](#persistence-type-eventplanmode) |
@@ -644,6 +645,26 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 ```
 
 Source: [`packages/medical/medical-case/src/domain.ts:61`](../packages/medical/medical-case/src/domain.ts)
+
+<a id="medicalimage-observation--log-only"></a>
+
+#### `medical/image-observation` — log-only
+
+```ts persistence-catalog
+/**
+ * Complete post-mutation observation of one session image. Every mutation
+ * writes the whole {@link MedicalImageObservation}, so the session log stays
+ * the only durable source of truth: persistence, resume, and fork inherit
+ * the observation with no second store.
+ *
+ * This event records what the MODEL saw. It is deliberately not a
+ * `medical/case-change`: patient-reported facts and model-observed evidence
+ * are separate domains, and nothing in this event can alter a case.
+ */
+'medical/image-observation': MedicalImageChangeMeta
+```
+
+Source: [`packages/medical/medical-image/src/domain.ts:75`](../packages/medical/medical-image/src/domain.ts)
 
 ### `model/*`
 
@@ -1471,6 +1492,14 @@ SHA-256: `254dce209e735f9cb6f6b7aec0354712b1611759ec02af4d35a96f2081e666f6`
 
 `"blocked"`
 
+<a id="persistence-type-blur"></a>
+
+### `"blur"`
+
+SHA-256: `5457ee02c7b6d63617fcb029386a1c4fb5e6e0c7f14db19753009ef4bc270e32`
+
+`"blur"`
+
 <a id="persistence-type-boolean"></a>
 
 ### `boolean`
@@ -2117,7 +2146,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:21`](../packages/llm/llm/src
 
 | Property | Presence | Type |
 |---|---|---|
-| `dt` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `dt` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `index` | required | `number` |
 | `texts` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
 | `time0` | required | `number` |
@@ -2141,7 +2170,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:28`](../packages/llm/llm/src
 
 | Property | Presence | Type |
 |---|---|---|
-| `dt` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `dt` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `index` | required | `number` |
 | `texts` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
 | `time0` | required | `number` |
@@ -2158,7 +2187,7 @@ Sources: [`packages/llm/llm/src/assistant-stream.ts:35`](../packages/llm/llm/src
 | Property | Presence | Type |
 |---|---|---|
 | `args` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
-| `dt` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `dt` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `id` | required | `string` |
 | `index` | required | `number` |
 | `name` | optional | `string` |
@@ -2516,7 +2545,7 @@ Sources: [`packages/compaction/compaction/src/types.ts:82`](../packages/compacti
 | Property | Presence | Type |
 |---|---|---|
 | `shadowedRange` | required | [`event:compaction/prune.data.shadowedRange`](#persistence-type-eventcompactionprunedatashadowedrange) |
-| `shadowedSeqs` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `shadowedSeqs` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `shadowedTokenCount` | required | `number` |
 
 <a id="persistence-type-eventcompactionprunedatashadowedrange"></a>
@@ -2600,7 +2629,7 @@ SHA-256: `9ff2ad8dddb836f75e8f6197fff2371323dfc396c3c6fb667e6e0b42fda79a5c`
 | `provider` | required | `string` |
 | `rawOutput` | required | [`event:agent/inbox/spliced.data.inserted[0].content`](#persistence-type-eventagentinboxspliceddatainserted0content) |
 | `shadowedRange` | required | [`event:compaction/prune.data.shadowedRange`](#persistence-type-eventcompactionprunedatashadowedrange) |
-| `shadowedSeqs` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `shadowedSeqs` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `shadowedTokenCount` | required | `number` |
 | `sourceCommandId` | optional | `string` |
 | `summary` | required | [`event:agent/inbox/spliced.data.inserted[0].content`](#persistence-type-eventagentinboxspliceddatainserted0content) |
@@ -2620,7 +2649,7 @@ SHA-256: `3aa261c8516b5c955ed12080e6257a56cbe513f6c9f0ac9274c12e96c196ebca`
 | `provider` | required | `string` |
 | `rawOutput` | optional | [`event:agent/inbox/spliced.data.inserted[0].content`](#persistence-type-eventagentinboxspliceddatainserted0content) |
 | `shadowedRange` | required | [`event:compaction/prune.data.shadowedRange`](#persistence-type-eventcompactionprunedatashadowedrange) |
-| `shadowedSeqs` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `shadowedSeqs` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `shadowedTokenCount` | required | `number` |
 | `sourceCommandId` | optional | `string` |
 | `summary` | required | [`event:agent/inbox/spliced.data.inserted[0].content`](#persistence-type-eventagentinboxspliceddatainserted0content) |
@@ -2938,6 +2967,28 @@ One of:
 
 - `null`
 - `string`
+
+<a id="persistence-type-eventmedicalimage-observation"></a>
+
+### `event:medical/image-observation`
+
+SHA-256: `a8318eb9a0a93699fc056e1a4646d05e65739e21228b9e6436d849c74f581f4f`
+
+| Property | Presence | Type |
+|---|---|---|
+| `data` | required | [`packages/medical/medical-image/src/domain.ts#MedicalImageChangeMeta`](#persistence-type-packagesmedicalmedical-imagesrcdomaintsmedicalimagechangemeta) |
+| `ignorable` | optional | `true` |
+| `seq` | required | `number` |
+| `time` | required | `number` |
+| `type` | required | `"medical/image-observation"` |
+
+<a id="persistence-type-eventmedicalimage-observationdataobservationqualityissues"></a>
+
+### `event:medical/image-observation.data.observation.quality.issues`
+
+SHA-256: `cc252b94ad47bcb87805a4b4453b4d81ce42d1cacf06827805c358e7bbc25fa7`
+
+Array of [`packages/medical/medical-image/src/types.ts#ImageQualityIssue`](#persistence-type-packagesmedicalmedical-imagesrctypestsimagequalityissue).
 
 <a id="persistence-type-eventmodelselection"></a>
 
@@ -3376,7 +3427,7 @@ SHA-256: `69becfb6b2d3fd5da91518089454cae8ef33f1835637ec44dde35dd077fd4bae`
 | `data` | required | [`event:system/message.data`](#persistence-type-eventsystemmessagedata) |
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
-| `sourceEventSeqs` | optional | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `sourceEventSeqs` | optional | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `surfaceOp` | required | [`packages/core/session/src/types.ts#SurfaceOp`](#persistence-type-packagescoresessionsrctypestssurfaceop) |
 | `time` | required | `number` |
 | `type` | required | `"system/message"` |
@@ -3720,7 +3771,7 @@ SHA-256: `29af48b840d0cd9e48b6f50bf3b354f8f6340607c5b99220a48e74f60beac9e2`
 | `data` | required | [`event:tool/result.data`](#persistence-type-eventtoolresultdata) |
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
-| `sourceEventSeqs` | optional | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `sourceEventSeqs` | optional | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `surfaceOp` | required | [`packages/core/session/src/types.ts#SurfaceOp`](#persistence-type-packagescoresessionsrctypestssurfaceop) |
 | `time` | required | `number` |
 | `type` | required | `"tool/result"` |
@@ -3963,7 +4014,7 @@ SHA-256: `314765bdff29c7862fb6ce820f1773563ba3094a680d163ea21180a2591b8578`
 | `data` | required | [`packages/llm/llm/src/message.ts#UserMessage`](#persistence-type-packagesllmllmsrcmessagetsusermessage) |
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
-| `sourceEventSeqs` | optional | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `sourceEventSeqs` | optional | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `surfaceOp` | required | [`packages/core/session/src/types.ts#SurfaceOp`](#persistence-type-packagescoresessionsrctypestssurfaceop) |
 | `time` | required | `number` |
 | `type` | required | `"user/message"` |
@@ -4333,6 +4384,14 @@ SHA-256: `db381570d8f9310891c2752b654678792294df6d3bc7f410994405ada345ffd8`
 
 `"medical/case-change"`
 
+<a id="persistence-type-medicalimage-observation"></a>
+
+### `"medical/image-observation"`
+
+SHA-256: `7500a257c1cc4e00b79f3c25b6c1023d15f6e753938eb25bae7a517ba50cd2e3`
+
+`"medical/image-observation"`
+
 <a id="persistence-type-model"></a>
 
 ### `"model"`
@@ -4414,6 +4473,22 @@ SHA-256: `0657d3ca5ac4e7bf79b00bcf860b1c7159d01a9da137497221ec2f1776e365f7`
 Sources: [`packages/core/session/src/types.ts:31`](../packages/core/session/src/types.ts)
 
 `number`
+
+<a id="persistence-type-observe"></a>
+
+### `"observe"`
+
+SHA-256: `99f6cefdbb82d610083ad38f5bee7e3b3bda46c6847289833dde9d6e6c9bbc7f`
+
+`"observe"`
+
+<a id="persistence-type-occlusion"></a>
+
+### `"occlusion"`
+
+SHA-256: `cbd9fa7bf50d2a2b1dbfd4c5a2ae3ce150e42b625197efc5e289cac11059ece0`
+
+`"occlusion"`
 
 <a id="persistence-type-one-shot"></a>
 
@@ -4502,7 +4577,7 @@ Sources: [`packages/compaction/compaction-image-offload/src/projection.ts:9`](..
 
 | Property | Presence | Type |
 |---|---|---|
-| `imageIndexes` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `imageIndexes` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `seq` | required | `number` |
 
 <a id="persistence-type-packagescontextagent-instructionssrcrendertsagentinstructionchange"></a>
@@ -5530,6 +5605,82 @@ Sources: [`packages/medical/medical-case/src/types.ts:39`](../packages/medical/m
 | `symptoms` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
 | `updatedAt` | required | `number` |
 
+<a id="persistence-type-packagesmedicalmedical-imagesrcdomaintsmedicalimagechangemeta"></a>
+
+### `packages/medical/medical-image/src/domain.ts#MedicalImageChangeMeta`
+
+SHA-256: `3766f874c28ac31058ab482943eeba24a60e2da9798da7726eea0d47d0edbc30`
+
+Sources: [`packages/medical/medical-image/src/domain.ts:22`](../packages/medical/medical-image/src/domain.ts) · [`packages/medical/medical-image/src/domain.ts:34`](../packages/medical/medical-image/src/domain.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `kind` | required | `"medical/image-observation"` |
+| `observation` | required | [`packages/medical/medical-image/src/types.ts#MedicalImageObservation`](#persistence-type-packagesmedicalmedical-imagesrctypestsmedicalimageobservation) |
+| `operation` | required | [`packages/medical/medical-image/src/types.ts#ImageObservationOperation`](#persistence-type-packagesmedicalmedical-imagesrctypestsimageobservationoperation) |
+| `version` | required | `1` |
+
+<a id="persistence-type-packagesmedicalmedical-imagesrctypestsimageobservationoperation"></a>
+
+### `packages/medical/medical-image/src/types.ts#ImageObservationOperation`
+
+SHA-256: `dec6c9fe3a40cd82ebc40ae63948254adc1a2d4a8f7cca2b9bb2d3da817c2e56`
+
+Sources: [`packages/medical/medical-image/src/types.ts:52`](../packages/medical/medical-image/src/types.ts)
+
+One of:
+
+- `"observe"`
+- `"update"`
+
+<a id="persistence-type-packagesmedicalmedical-imagesrctypestsimagequality"></a>
+
+### `packages/medical/medical-image/src/types.ts#ImageQuality`
+
+SHA-256: `a9a3136b2a91d8e16d978ae24bfeeef6362de9c4eaa34f4641f248d2f1d4edef`
+
+Sources: [`packages/medical/medical-image/src/types.ts:44`](../packages/medical/medical-image/src/types.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `issues` | required | [`event:medical/image-observation.data.observation.quality.issues`](#persistence-type-eventmedicalimage-observationdataobservationqualityissues) |
+| `usable` | required | `boolean` |
+
+<a id="persistence-type-packagesmedicalmedical-imagesrctypestsimagequalityissue"></a>
+
+### `packages/medical/medical-image/src/types.ts#ImageQualityIssue`
+
+SHA-256: `584b216dc6ca333fa072302ac2ddb365cacbe4d90e2c90c285ba805872379ec0`
+
+Sources: [`packages/medical/medical-image/src/types.ts:27`](../packages/medical/medical-image/src/types.ts)
+
+One of:
+
+- `"blur"`
+- `"occlusion"`
+- `"poor_lighting"`
+- `"too_distant"`
+- `"unable_to_assess"`
+
+<a id="persistence-type-packagesmedicalmedical-imagesrctypestsmedicalimageobservation"></a>
+
+### `packages/medical/medical-image/src/types.ts#MedicalImageObservation`
+
+SHA-256: `630a06ab3f95d1cc21ea2c554d219cfd46a88e754d5886e6d4a7ce8e9d3e980f`
+
+Sources: [`packages/medical/medical-image/src/types.ts:71`](../packages/medical/medical-image/src/types.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `attachment` | required | [`packages/attachment/attachment/src/types.ts#ImageAttachmentRef`](#persistence-type-packagesattachmentattachmentsrctypestsimageattachmentref) |
+| `bodyRegion` | required | [`event:medical/case-change.data.case.additionalNotes`](#persistence-type-eventmedicalcase-changedatacaseadditionalnotes) |
+| `createdAt` | required | `number` |
+| `findings` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
+| `quality` | required | [`packages/medical/medical-image/src/types.ts#ImageQuality`](#persistence-type-packagesmedicalmedical-imagesrctypestsimagequality) |
+| `revision` | required | `number` |
+| `uncertainty` | required | [`event:assistant/attempt.data.stream[0][0].texts`](#persistence-type-eventassistantattemptdatastream00texts) |
+| `updatedAt` | required | `number` |
+
 <a id="persistence-type-packagessandboxsandboxsrcindextssandboxmode"></a>
 
 ### `packages/sandbox/sandbox/src/index.ts#SandboxMode`
@@ -5709,7 +5860,7 @@ Sources: [`packages/session/session-title-llm/src/index.ts:27`](../packages/sess
 | Property | Presence | Type |
 |---|---|---|
 | `maxTokens` | required | `number` |
-| `messageSeqs` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `messageSeqs` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `messages` | required | [`event:session/title-llm-request.data.messages`](#persistence-type-eventsessiontitle-llm-requestdatamessages) |
 | `route` | required | [`packages/session/session-title/src/types.ts#SessionTitleModelIdentity`](#persistence-type-packagessessionsession-titlesrctypestssessiontitlemodelidentity) |
 | `system` | required | `string` |
@@ -5725,7 +5876,7 @@ Sources: [`packages/session/session-title/src/types.ts:41`](../packages/session/
 
 | Property | Presence | Type |
 |---|---|---|
-| `messageSeqs` | required | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `messageSeqs` | required | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `source` | required | [`packages/session/session-title/src/types.ts#SessionTitleSource`](#persistence-type-packagessessionsession-titlesrctypestssessiontitlesource) |
 | `title` | required | `string` |
 
@@ -6042,6 +6193,14 @@ SHA-256: `e654d28d1e6c471147310d2fba396d00969cfe6ed9022626d3f2c2312e0b1cbb`
 
 `"plugin"`
 
+<a id="persistence-type-poor_lighting"></a>
+
+### `"poor_lighting"`
+
+SHA-256: `76b0a22b578d23f7536af7f2b5b5db3ce52bb3ea9a660539c2d15557738274e5`
+
+`"poor_lighting"`
+
 <a id="persistence-type-positive"></a>
 
 ### `"positive"`
@@ -6258,7 +6417,7 @@ SHA-256: `5776e5553ff2dfe3f5bc202dbb1e7c9f93e35a531aebb7764c23b2b6153b2ccc`
 
 One of:
 
-- [`SessionEventEnvelope[40]`](#persistence-type-sessioneventenvelope40)
+- [`SessionEventEnvelope[41]`](#persistence-type-sessioneventenvelope41)
 - [`SessionEventEnvelope[6]`](#persistence-type-sessioneventenvelope6)
 - [`SessionEventEnvelope[0]`](#persistence-type-sessioneventenvelope0)
 
@@ -6275,9 +6434,9 @@ SHA-256: `e3e77b26f0148755a505f5b8ea843a3be117827d4703bb5754d9dc8ddbef521f`
 | `time` | required | `number` |
 | `type` | required | `string` |
 
-<a id="persistence-type-sessioneventenvelope40"></a>
+<a id="persistence-type-sessioneventenvelope41"></a>
 
-### `SessionEventEnvelope[40]`
+### `SessionEventEnvelope[41]`
 
 SHA-256: `998f22585a5d73ec005365e203f07fc3b3a029e82323fdda3fd7f13b0a9639d0`
 
@@ -6285,14 +6444,14 @@ SHA-256: `998f22585a5d73ec005365e203f07fc3b3a029e82323fdda3fd7f13b0a9639d0`
 |---|---|---|
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
-| `sourceEventSeqs` | optional | [`SessionEventEnvelope[40].sourceEventSeqs`](#persistence-type-sessioneventenvelope40sourceeventseqs) |
+| `sourceEventSeqs` | optional | [`SessionEventEnvelope[41].sourceEventSeqs`](#persistence-type-sessioneventenvelope41sourceeventseqs) |
 | `surfaceOp` | required | [`packages/core/session/src/types.ts#SurfaceOp`](#persistence-type-packagescoresessionsrctypestssurfaceop) |
 | `time` | required | `number` |
 | `type` | required | `string` |
 
-<a id="persistence-type-sessioneventenvelope40sourceeventseqs"></a>
+<a id="persistence-type-sessioneventenvelope41sourceeventseqs"></a>
 
-### `SessionEventEnvelope[40].sourceEventSeqs`
+### `SessionEventEnvelope[41].sourceEventSeqs`
 
 SHA-256: `5d03ba38734809bcbd2a55221bd938b3b3fc34b49bb686c6113e9e4931e3aa78`
 
@@ -6552,6 +6711,14 @@ SHA-256: `af0750d32d97d47b12b7361a587db41894b17e04c9a805fe212f0114aa2248c7`
 
 `"todo/write"`
 
+<a id="persistence-type-too_distant"></a>
+
+### `"too_distant"`
+
+SHA-256: `ff83701524a1758c24cc228fcd0c5734ad6216e5d3236e3c12ba3390d57d79b1`
+
+`"too_distant"`
+
 <a id="persistence-type-tool"></a>
 
 ### `"tool"`
@@ -6687,6 +6854,14 @@ SHA-256: `4312134fc6f9cad507c31390bd3d147535492dd77621ec517c5e85f853d53a03`
 SHA-256: `0af3ecfb8c60d416fc40a7cc4fb2c4851a8e46608b2b38ab9e510670c971aa1f`
 
 `"turn/start"`
+
+<a id="persistence-type-unable_to_assess"></a>
+
+### `"unable_to_assess"`
+
+SHA-256: `b4b043ff88b6e80d6878093a2824cabb92428bee286de7898e246b5b28eb2b7a`
+
+`"unable_to_assess"`
 
 <a id="persistence-type-unavailable"></a>
 

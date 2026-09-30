@@ -1,0 +1,307 @@
+{
+  "formatVersion": 1,
+  "roots": [
+    {
+      "key": "event:medical/image-observation",
+      "kind": "event",
+      "event": "medical/image-observation",
+      "surface": false,
+      "digest": "a8318eb9a0a93699fc056e1a4646d05e65739e21228b9e6436d849c74f581f4f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 29,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "kind",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "observation",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "operation",
+                "type": 25,
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": 28,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "medical/image-observation"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "bodyRegion",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "createdAt",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "findings",
+                "type": 15,
+                "optional": false
+              },
+              {
+                "name": "quality",
+                "type": 16,
+                "optional": false
+              },
+              {
+                "name": "revision",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "uncertainty",
+                "type": 15,
+                "optional": false
+              },
+              {
+                "name": "updatedAt",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              14
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "issues",
+                "type": 17,
+                "optional": false
+              },
+              {
+                "name": "usable",
+                "type": 24,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 18
+          },
+          {
+            "kind": "union",
+            "types": [
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "blur"
+          },
+          {
+            "kind": "literal",
+            "value": "occlusion"
+          },
+          {
+            "kind": "literal",
+            "value": "poor_lighting"
+          },
+          {
+            "kind": "literal",
+            "value": "too_distant"
+          },
+          {
+            "kind": "literal",
+            "value": "unable_to_assess"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "union",
+            "types": [
+              26,
+              27
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "observe"
+          },
+          {
+            "kind": "literal",
+            "value": "update"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          },
+          {
+            "kind": "literal",
+            "value": true
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}
