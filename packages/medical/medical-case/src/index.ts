@@ -156,6 +156,11 @@ export class MedicalCaseService extends Service {
    */
   constructor(ctx: Context) {
     super(ctx, 'medicalCase')
+    // The case is derived by folding the session log, never stored as a current
+    // row. A stored row would have to be kept in step with the events that
+    // explain it, and the two could disagree after a crash between the write and
+    // the update; a fold cannot disagree with its own inputs, and it reconstructs
+    // the same case for a process that only has the log.
     ctx.sessionProjections.register(medicalCaseProjectionDefinition)
   }
 

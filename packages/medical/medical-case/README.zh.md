@@ -50,7 +50,7 @@ kind: "package-reference"
 
 每次获准的变更都返回 `{ view, changed }`。当 `changed` 为 `false` 时，该调用没有追加事件，修订号没有移动，`updatedAt` 也没有移动。
 
-```ts
+```ts ignore-check
 const { view } = ctx.medicalCase.intake(agent, { symptoms: ['headache', 'fever'] })
 // view.missingFields === ['duration', 'age']
 

@@ -28,12 +28,18 @@ The medical group holds domain capabilities for medical consultation and intake 
 | [`tool-medical-case-intake`](tool-medical-case-intake/README.md) | Records the case on first contact and reports the required fields still missing | registers on `ctx.tools` |
 | [`tool-medical-case-update`](tool-medical-case-update/README.md) | Applies one incremental change to the recorded case, never clearing a field silently | registers on `ctx.tools` |
 | [`tool-medical-case-get`](tool-medical-case-get/README.md) | Reads the authoritative case and the facts still missing, without changing either | registers on `ctx.tools` |
+| [`medical-image`](medical-image/README.md) | One durable observation per attached image per session: record, update, strict replay, and the attachment authorization boundary | `ctx.medicalImage` |
+| [`tool-medical-image-observe`](tool-medical-image-observe/README.md) | Records what the model directly saw in one image, with its quality limits and what could not be determined | registers on `ctx.tools` |
+| [`tool-medical-image-get`](tool-medical-image-get/README.md) | Reads observations back, addressed by attachment, so a session holding several images keeps them apart | registers on `ctx.tools` |
+| [`medical-eval`](medical-eval/README.md) | Golden-case replay, the pure evaluator, the failure taxonomy, and the report — test infrastructure that publishes no service | nothing (test infrastructure) |
 
 -----
 
 <a id="related-documentation"></a>
 ## Related documentation
 
+- [MedHarness architecture](../../docs/medharness-architecture.md) — what the harness provides, what this group adds, and where the seam is.
+- [MedHarness engineering design](../../docs/medharness-engineering-design.md) — the five problems this group solves, written as problem, solution, implementation, and payoff.
 - [Medical case subsystem](../../docs/subsystems/medical-case.md) — the case state, its durable event, and the service API.
 - [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-medical-case-intake) — the three schemas the model receives.
 - [Same-session goal domain](../goal/README.md) — the sibling pattern this group follows: event-sourced per-session state.

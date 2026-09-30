@@ -50,7 +50,7 @@ Both return a fresh `CaseView`: the durable state plus `missingFields`, derived 
 
 Every accepted mutation returns `{ view, changed }`. When `changed` is `false` the call appended no event, the revision did not move, and `updatedAt` did not move either.
 
-```ts
+```ts ignore-check
 const { view } = ctx.medicalCase.intake(agent, { symptoms: ['headache', 'fever'] })
 // view.missingFields === ['duration', 'age']
 

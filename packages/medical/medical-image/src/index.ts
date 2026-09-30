@@ -232,6 +232,10 @@ export class MedicalImageService extends Service {
    */
   constructor(ctx: Context) {
     super(ctx, 'medicalImage')
+    // Observations are a fold over the session log, not a stored collection. The
+    // durable event is the only place an observation exists, so persistence,
+    // resume, and fork inheritance all come from the log rather than a second
+    // store that would need its own consistency story.
     ctx.sessionProjections.register(medicalImageProjectionDefinition)
   }
 
@@ -364,6 +368,10 @@ export class MedicalImageService extends Service {
       observation: next,
     }
     agent.session.append('medical/image-observation', change)
+    // Read the committed value back out of the log instead of returning the one
+    // just computed. What a caller is told must be what the session now holds,
+    // so a divergence between the write and the fold surfaces here rather than
+    // becoming a reply the durable record does not support.
     const committed = this.observations(agent.session)
       .find(observation => String(observation.attachment.attachmentId) === String(next.attachment.attachmentId))
     /* v8 ignore next -- the change just committed is the latest record for this attachment */

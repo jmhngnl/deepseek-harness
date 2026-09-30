@@ -151,6 +151,11 @@ export function apply(ctx: Context): void {
           'MEDICAL_IMAGE_AGENT_REQUIRED',
         )
       }
+      // `args.attachmentId` is model output, so it is untrusted input: the tool
+      // forwards it unchanged and lets the domain resolve it against this
+      // session's own messages. Validating here instead would put the boundary in
+      // a package that has no authority over the session, and a second copy of
+      // the rule is a second place for it to drift.
       const result = ctx.medicalImage.observe(agent, {
         attachmentId: args.attachmentId,
         bodyRegion: args.bodyRegion,

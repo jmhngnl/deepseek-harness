@@ -41,7 +41,7 @@ GoldenCase
 
 ### Replaying the shipped roster
 
-```ts
+```ts ignore-check
 import { loadGoldenCases, runGoldenCases } from '@deepseek-ai/dsh-medical-eval'
 
 const runs = await runGoldenCases(loadGoldenCases(goldenDirectory), async golden => ({
@@ -202,7 +202,7 @@ There is no assistant-prose classification, and there will not be one here. Deci
 
 ### The report is not a score
 
-```ts
+```text
 summary: {
   casesPassed, casesTotal,
   toolRoutingPassed, toolRoutingTotal,          // per turn

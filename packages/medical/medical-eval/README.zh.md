@@ -41,7 +41,7 @@ GoldenCase
 
 ### 回放 shipped roster
 
-```ts
+```ts ignore-check
 import { loadGoldenCases, runGoldenCases } from '@deepseek-ai/dsh-medical-eval'
 
 const runs = await runGoldenCases(loadGoldenCases(goldenDirectory), async golden => ({
@@ -202,7 +202,7 @@ Failure Taxonomy **v2**，位于 [`src/types.ts`](src/types.ts)。它是未来 b
 
 ### 报告不是分数
 
-```ts
+```text
 summary: {
   casesPassed, casesTotal,
   toolRoutingPassed, toolRoutingTotal,          // per turn

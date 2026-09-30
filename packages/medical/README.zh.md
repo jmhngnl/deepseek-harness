@@ -28,12 +28,18 @@ medical 组承载构建在 harness 之上的医疗咨询与辅助分诊领域能
 | [`tool-medical-case-intake`](tool-medical-case-intake/README.zh.md) | 首次联系时记录病例，并报告仍然缺失的必填字段 | 注册到 `ctx.tools` |
 | [`tool-medical-case-update`](tool-medical-case-update/README.zh.md) | 对已记录病例应用一次增量变更，绝不静默清空字段 | 注册到 `ctx.tools` |
 | [`tool-medical-case-get`](tool-medical-case-get/README.zh.md) | 只读地读回权威病例与仍然缺失的字段 | 注册到 `ctx.tools` |
+| [`medical-image`](medical-image/README.zh.md) | 每会话每张附加图像一份持久观察：记录、更新、严格回放，以及附件授权边界 | `ctx.medicalImage` |
+| [`tool-medical-image-observe`](tool-medical-image-observe/README.zh.md) | 记录模型在某张图中直接看到的内容，含质量限制与无法判定的部分 | 注册到 `ctx.tools` |
+| [`tool-medical-image-get`](tool-medical-image-get/README.zh.md) | 按附件读回观察，使持有多个图像的会话能把它们区分开 | 注册到 `ctx.tools` |
+| [`medical-eval`](medical-eval/README.zh.md) | 黄金用例回放、纯函数 Evaluator、失败分类法与报告 —— 不发布任何服务的测试基础设施 | 无（测试基础设施） |
 
 -----
 
 <a id="related-documentation"></a>
 ## 相关文档
 
+- [MedHarness 架构](../../docs/medharness-architecture.zh.md)——harness 提供了什么、本组增加了什么、接缝在哪里。
+- [MedHarness 工程设计](../../docs/medharness-engineering-design.zh.md)——本组解决的五个问题，按「问题、方案、实现、收益」写成。
 - [医疗接诊病例子系统](../../docs/subsystems/medical-case.zh.md)——病例状态、持久事件与服务 API。
 - [生成的工具目录](../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-medical-case-intake)——模型接收的五个 schema。
 - [同会话目标领域](../goal/README.zh.md)——本组遵循的同类模式：事件溯源会话内状态。

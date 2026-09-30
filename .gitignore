@@ -51,3 +51,16 @@ native/system/test/bin/
 # ignored: the rest of `.medharness/` may hold configuration and manifests that
 # belong in history.
 /.medharness/eval-runs/
+
+# Personal career material derived from this project — resume framings and an
+# interview question bank. It describes the repository, so it lives beside the
+# checkout, but it is one person's job-search working material rather than
+# project documentation, and it must not reach the published docs site. The
+# public technical documentation is `docs/medharness-*.md`.
+/.career/
+
+# VitePress writes a timestamped copy of its config while the documentation site
+# is built, and `doc-sync` runs that build. The copy is build residue with a
+# unique name, so it cannot be committed as source and would otherwise reappear
+# in `git status` after every documentation run.
+website/.vitepress/*.timestamp-*.mjs
