@@ -140,13 +140,70 @@ export interface MedicalImageProjectionState {
   readonly failure: string | null
 }
 
+/**
+ * One observation as a browser session renders it.
+ *
+ * The identity is still the attachment, but the browser addresses observations
+ * by the display name the person who uploaded the image can recognize, so both
+ * are carried: `attachmentId` is the durable key and `displayName` is what the
+ * user called the file. `displayName` is null when the attachment was admitted
+ * without one — the UI falls back to its own positional label rather than
+ * inventing a filename.
+ *
+ * `usable` and `qualityIssues` are flattened from {@link ImageQuality} because a
+ * wire value should not make a renderer unpack a nested shape for two fields
+ * that are always read together.
+ */
+export interface MedicalImageWireObservation {
+  /** Canonical durable attachment identity; the observation's key. */
+  readonly attachmentId: string
+  /** The admitted display name, or null when the attachment carried none. */
+  readonly displayName: string | null
+  /** Admitted media type, for choosing a thumbnail renderer. */
+  readonly mediaType: string
+  /** Positive revision; 1 on the first observation of this attachment. */
+  readonly revision: number
+  /** The body region the image depicts, or null when none was stated. */
+  readonly bodyRegion: string | null
+  /** Directly visible findings, in first-seen order. */
+  readonly findings: string[]
+  /** Whether any part of the image could be described. */
+  readonly usable: boolean
+  /** Every limitation observed, in a stable order. */
+  readonly qualityIssues: ImageQualityIssue[]
+  /** What the observer could not determine from this image. */
+  readonly uncertainty: string[]
+  /** Epoch milliseconds of the latest observation; never decreases. */
+  readonly updatedAt: number
+}
+
+/**
+ * The session's observations as a browser session renders them.
+ *
+ * Every field is a directly visible property of an image or an explicit limit
+ * of the observation. There is no confidence, severity, diagnosis, treatment,
+ * or risk — the domain has none, so none can appear here.
+ */
+export interface MedicalImageWireView {
+  /** Every observation in this Session, ordered by first observation. */
+  readonly observations: MedicalImageWireObservation[]
+}
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     /**
      * Every image the model has observed in this Session, addressed by
-     * attachment. Host-only: the value carries clinical free text and image
-     * references, so it is never exposed on a client wire surface.
+     * attachment. Host-only fold state: the wire face publishes the owner-facing
+     * projection of it, and the host value itself never leaves the process.
      */
     medicalImage: MedicalImageProjectionState
+  }
+  interface SessionProjectionMap {
+    /**
+     * The session's model-observed images, or an empty list before the first
+     * observation. The host folds it from `medical/image-observation` events
+     * and publishes the finished value; the browser never folds an observation.
+     */
+    medicalImage: MedicalImageWireView
   }
 }

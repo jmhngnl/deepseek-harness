@@ -232,3 +232,18 @@
     # several images keeps them apart instead of exposing only the latest.
     - id: tool-medical-image-get
       name: '@deepseek-ai/dsh-tool-medical-image-get'
+
+    # ── The intake surface (browser only) ───────────────────────────────────
+    #
+    # The MedHarness page: a right-Sidebar tab that shows the patient-reported
+    # record beside the model-observed image evidence, as two panels that never
+    # share an accent, because telling "what I said" from "what it saw" is the
+    # whole point of showing them together.
+    #
+    # It registers no tool, no service, and no host behaviour: the browser half
+    # draws two session projections the host already folds, and the node half is
+    # an empty apply. The `medharness` headless profile mounts this row too and
+    # pays only the cost of importing an inert module; the Web profile is where
+    # it does anything at all.
+    - id: ui-medharness
+      name: '@deepseek-ai/dsh-client-ui-medharness'

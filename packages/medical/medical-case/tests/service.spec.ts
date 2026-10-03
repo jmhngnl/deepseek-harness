@@ -234,11 +234,34 @@ describe('MedicalCaseService reads the authoritative projection', () => {
     expect(view).toMatchObject({ revision: 3, symptoms: ['headache'], duration: '2 days', age: 25, missingFields: [] })
   })
 
-  it('keeps the projection host-only, so no client view is published for it', async () => {
+  it('publishes the owner-facing client view the Web product renders', async () => {
     const { ctx, open } = await harness()
     const agent = await open('session-a')
-    ctx.medicalCase.create(agent, { symptoms: ['headache'] })
-    expect(ctx.sessionProjections.snapshot(agent.session).values).not.toHaveProperty('medicalCase')
+    ctx.medicalCase.intake(agent, { symptoms: ['headache'] })
+
+    // The Web product renders the case, so the unit publishes a wire face: the
+    // browser receives a finished value and never folds a case itself. The gap
+    // report is derived on the host, by the same rule the read model uses.
+    const values = ctx.sessionProjections.snapshot(agent.session).values
+    expect(values['medicalCase']).toMatchObject({
+      revision: 1,
+      symptoms: ['headache'],
+      duration: null,
+      age: null,
+      additionalNotes: null,
+      missingFields: ['duration', 'age'],
+    })
+    // The published shape is closed: nothing clinical exists in the domain, so
+    // nothing clinical can reach a browser through this face.
+    expect(Object.keys(values['medicalCase'] as object).sort()).toEqual([
+      'additionalNotes', 'age', 'caseId', 'duration', 'missingFields', 'revision', 'symptoms', 'updatedAt',
+    ])
+  })
+
+  it('publishes an explicit null before the first create', async () => {
+    const { ctx, open } = await harness()
+    const agent = await open('session-a')
+    expect(ctx.sessionProjections.snapshot(agent.session).values['medicalCase']).toBeNull()
   })
 
   it('derives missingFields on read, never from a persisted copy', async () => {

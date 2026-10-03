@@ -1,0 +1,194 @@
+/* The intake page: two evidence panels stacked in the pane's scroller.
+ *
+ * The accent on each section heading is the design, not decoration. A reader
+ * has to be able to tell "what I said" from "what it saw" without reading the
+ * heading twice, and colour is the fastest way to say that — the two panels
+ * therefore never share an accent. */
+
+.page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.55;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-l1, transparent);
+}
+
+/* Patient-reported: the calm, factual accent. */
+.section[data-evidence='patient-reported'] {
+  border-left-color: var(--dsw-alias-brand-primary, #4b6bfb);
+}
+
+/* Model-observed: a visibly different accent, because it is different evidence. */
+.section[data-evidence='model-observed'] {
+  border-left-color: var(--dsw-alias-accent-amber, #c2820a);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.headCaption {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+/* The completeness list: three required facts, each recorded or still needed. */
+.checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkDone,
+.checkMissing {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.checkDone {
+  color: var(--dsw-alias-label-primary);
+}
+
+.checkMissing {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.checkGlyph {
+  font-size: 12px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.fields dt {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+/* One observed image. */
+.image {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 6px;
+}
+
+.imageHead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.imageName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.imageRevision {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.usable,
+.unusable {
+  margin: 0;
+  font-size: 12px;
+}
+
+.usable {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.unusable {
+  color: var(--dsw-alias-accent-amber, #c2820a);
+}
+
+.group {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+}
+
+.groupLabel {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.groupValue {
+  overflow-wrap: anywhere;
+}
+
+/* The pane is often narrow; one column keeps the labels from crowding values. */
+@media (max-width: 420px) {
+  .fields,
+  .group {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .fields dt,
+  .groupLabel {
+    font-size: 12px;
+  }
+}

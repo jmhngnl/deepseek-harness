@@ -29,7 +29,7 @@ import {
   resolveIntakeFields,
 } from './patch.ts'
 import { CaseId, MAX_AGE_YEARS, MEDICAL_CASE_CHANGE_VERSION, MedicalCaseError } from './runtime.ts'
-import type { CaseOperation, CasePatch, CaseIntakeRequest, CaseState, CaseUpdateResult, CaseView, MedicalCaseProjectionState } from './types.ts'
+import type { CaseOperation, CasePatch, CaseIntakeRequest, CaseState, CaseUpdateResult, CaseView, MedicalCaseProjectionState, MedicalCaseWireView } from './types.ts'
 import type { MedicalCaseChangeMeta } from './domain.ts'
 
 // The pure type outlet (./types.ts, ONE home of the `medicalCase` projection-key
@@ -122,8 +122,57 @@ export function applyMedicalCaseProjection(
 }
 
 /**
- * The `medicalCase` projection unit: host-only, because the folded value carries
- * clinical free text that no client wire surface should carry.
+ * Strict wire schema for the owner-facing `medicalCase` value a browser
+ * session receives. Strict, like every other boundary here: a field the
+ * browser does not expect is a bug in the publisher, not something to ignore.
+ */
+export const medicalCaseWireViewSchema: ZodType<MedicalCaseWireView | null> = zod.union([
+  zod.object({
+    caseId: zod.string().min(1),
+    revision: zod.number().int().positive(),
+    symptoms: zod.array(zod.string()),
+    duration: zod.string().nullable(),
+    age: zod.number().int().min(0).max(MAX_AGE_YEARS).nullable(),
+    additionalNotes: zod.string().nullable(),
+    missingFields: zod.array(zod.enum(['symptoms', 'duration', 'age'])),
+    updatedAt: zod.number(),
+  }).strict(),
+  zod.null(),
+]) as unknown as ZodType<MedicalCaseWireView | null>
+
+/**
+ * Project one fold state onto the owner-facing wire value.
+ *
+ * The gap report is derived here, on the host, by the same rule the read model
+ * uses — never recomputed in the browser, so a completeness indicator cannot
+ * disagree with the record it describes.
+ * @param state - the unit's current fold state.
+ * @returns the wire value, or `null` before the first create.
+ */
+function caseWireView(state: MedicalCaseProjectionState): MedicalCaseWireView | null {
+  const current = state.current
+  if (current === null) return null
+  return {
+    caseId: current.caseId,
+    revision: current.revision,
+    symptoms: current.symptoms,
+    duration: current.duration,
+    age: current.age,
+    additionalNotes: current.additionalNotes,
+    missingFields: deriveMissingFields(current),
+    updatedAt: current.updatedAt,
+  }
+}
+
+/**
+ * The `medicalCase` projection unit. It publishes a wire face because the Web
+ * product renders the case, and the session owner is the person who stated it:
+ * the owner-facing view carries the recorded facts verbatim, and nothing the
+ * domain does not have (no diagnosis, severity, or risk field) can appear.
+ *
+ * `failure` stays host-side. It is a replay diagnostic for operators, and a
+ * browser cannot act on it; the value a client receives is always the last
+ * state the fold accepted.
  *
  * Bump {@link medicalCaseProjectionDefinition.stateVersion} whenever the
  * serialized fields or the fold semantics change, so persisted checkpoint rows
@@ -134,6 +183,7 @@ export const medicalCaseProjectionDefinition = {
   stateSchema: medicalCaseProjectionStateSchema,
   init: (): MedicalCaseProjectionState => ({ current: null, seenCaseIds: [], failure: null }),
   apply: applyMedicalCaseProjection,
+  wire: { viewSchema: medicalCaseWireViewSchema, view: caseWireView },
   stateVersion: 1,
 } satisfies ProjectionDefinition<'medicalCase', MedicalCaseProjectionState>
 

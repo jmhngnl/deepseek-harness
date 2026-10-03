@@ -44,6 +44,7 @@ import type {
   ImageObservationResult,
   MedicalImageObservation,
   MedicalImageProjectionState,
+  MedicalImageWireView,
 } from './types.ts'
 
 // The pure type outlet (./types.ts, ONE home of the `medicalImage` projection-key
@@ -161,9 +162,59 @@ export function applyMedicalImageProjection(
 }
 
 /**
- * The `medicalImage` projection unit: host-only, because the folded value carries
- * clinical free text and durable attachment references that no client wire
- * surface should carry.
+ * Strict wire schema for the owner-facing `medicalImage` value a browser
+ * session receives. Strict, like every other boundary here: a field the
+ * browser does not expect is a bug in the publisher, not something to ignore.
+ */
+export const medicalImageWireViewSchema: ZodType<MedicalImageWireView> = zod.object({
+  observations: zod.array(zod.object({
+    attachmentId: zod.string().min(1),
+    displayName: zod.string().min(1).nullable(),
+    mediaType: zod.string().min(1),
+    revision: zod.number().int().positive(),
+    bodyRegion: zod.string().min(1).nullable(),
+    findings: zod.array(zod.string()),
+    usable: zod.boolean(),
+    qualityIssues: zod.array(zod.enum(IMAGE_QUALITY_ISSUES)),
+    uncertainty: zod.array(zod.string()),
+    updatedAt: zod.number(),
+  }).strict()),
+}).strict()
+
+/**
+ * Project one fold state onto the owner-facing wire value.
+ *
+ * The quality verdict is flattened here rather than in the browser, so a
+ * renderer reads two fields instead of unpacking a nested shape on every paint.
+ * @param state - the unit's current fold state.
+ * @returns the wire value; an empty list before the first observation.
+ */
+function imageWireView(state: MedicalImageProjectionState): MedicalImageWireView {
+  return {
+    observations: state.observations.map(observation => ({
+      attachmentId: String(observation.attachment.attachmentId),
+      displayName: observation.attachment.name ?? null,
+      mediaType: observation.attachment.mediaType,
+      revision: observation.revision,
+      bodyRegion: observation.bodyRegion,
+      findings: observation.findings,
+      usable: observation.quality.usable,
+      qualityIssues: observation.quality.issues,
+      uncertainty: observation.uncertainty,
+      updatedAt: observation.updatedAt,
+    })),
+  }
+}
+
+/**
+ * The `medicalImage` projection unit. It publishes a wire face because the Web
+ * product renders the observations, and the session owner is the person who
+ * attached the images: the owner-facing view carries what the model said it saw
+ * and nothing the domain does not have (no confidence, severity, or diagnosis).
+ *
+ * `failure` stays host-side. It is a replay diagnostic for operators, and a
+ * browser cannot act on it; the value a client receives is always the last
+ * state the fold accepted.
  *
  * Bump {@link medicalImageProjectionDefinition.stateVersion} whenever the
  * serialized fields or the fold semantics change, so persisted checkpoint rows
@@ -174,6 +225,7 @@ export const medicalImageProjectionDefinition = {
   stateSchema: medicalImageProjectionStateSchema,
   init: (): MedicalImageProjectionState => ({ observations: [], failure: null }),
   apply: applyMedicalImageProjection,
+  wire: { viewSchema: medicalImageWireViewSchema, view: imageWireView },
   stateVersion: 1,
 } satisfies ProjectionDefinition<'medicalImage', MedicalImageProjectionState>
 

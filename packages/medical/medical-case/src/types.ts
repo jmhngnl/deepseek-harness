@@ -62,6 +62,49 @@ export interface CaseView extends CaseState {
 }
 
 /**
+ * The case as a browser session renders it: the whole current record plus the
+ * gap report, or `null` before the first create.
+ *
+ * This is the owner-facing view of the owner's own session, so it carries the
+ * recorded facts verbatim — the person reading it is the person who stated
+ * them. It is deliberately not a sanitized summary: `missingFields` is derived
+ * on the host by {@link CaseView}'s rule, never recomputed in the browser, so
+ * the completeness indicator and the record cannot disagree.
+ *
+ * Nothing here is a clinical conclusion. There is no diagnosis, severity, or
+ * risk field, because the domain has none to expose.
+ */
+export interface MedicalCaseWireView {
+  /** Stable case identity, or null before the first create. */
+  readonly caseId: CaseId | null
+  /** Positive revision; zero while no case exists. */
+  readonly revision: number
+  /** Symptoms exactly as recorded, in first-seen order. */
+  readonly symptoms: string[]
+  /** Free-text duration, or null while unrecorded. */
+  readonly duration: string | null
+  /** Whole years of age, or null while unrecorded. */
+  readonly age: number | null
+  /** Optional context the user volunteered, or null while unrecorded. */
+  readonly additionalNotes: string | null
+  /** Required facts absent from the current revision. */
+  readonly missingFields: MissingField[]
+  /** Epoch milliseconds of the latest mutation, or null while no case exists. */
+  readonly updatedAt: number | null
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionMap {
+    /**
+     * The session's current intake case and its gap report, or `null` before
+     * the first create. The host folds it from `medical/case-change` events
+     * and publishes the finished value; the browser never folds a case.
+     */
+    medicalCase: MedicalCaseWireView | null
+  }
+}
+
+/**
  * First-contact input. Every field may be omitted: recording that the user has
  * not said something yet is a successful, useful outcome.
  */
