@@ -112,6 +112,22 @@ describe('web e2e: MedHarness product surface, photographed', () => {
       await shoot(page, viewport.name)
     }
 
+    // The narrow surface, one screenshot per state. The selector is the whole
+    // point of this phase: at 390px the record has no column to live in, so
+    // these three frames are the only evidence that it is reachable at all.
+    await page.setViewportSize({ width: VIEWPORTS[1].width, height: VIEWPORTS[1].height })
+    await page.waitForTimeout(400)
+    await page.getByTestId('medharness-surface-conversation').waitFor({ timeout: 10_000 })
+    await shoot(page, 'mobile-chat')
+
+    await page.getByTestId('medharness-surface-record').click()
+    await page.getByTestId('medharness-mobile-record').waitFor({ timeout: 10_000 })
+    await shoot(page, 'mobile-record')
+
+    await page.getByRole('button', { name: '最近接诊' }).click()
+    await page.getByRole('dialog', { name: '最近接诊' }).waitFor({ timeout: 10_000 })
+    await shoot(page, 'mobile-intakes')
+
     // The tripwire is evidence, not an assertion: this case photographs what
     // the page looks like, and a console warning is reported by the summary.
     if (tripwire.pageErrors.length > 0) throw new Error(`page errors: ${tripwire.pageErrors.join(' | ')}`)

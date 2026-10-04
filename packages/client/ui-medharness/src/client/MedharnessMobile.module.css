@@ -1,0 +1,180 @@
+/* The narrow product surface.
+ *
+ * Everything here is `position: fixed` over the frame rather than inside a
+ * column, because at this width the frame has no third column to put anything
+ * in. The layers sit above the frame's own chrome and below nothing: a person
+ * on a phone sees one surface at a time, and the conversation stays mounted
+ * underneath so switching back is a repaint. */
+
+.bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+  height: 48px;
+  padding: 0 10px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-bg-l1, #fff);
+  color: var(--dsw-alias-label-primary);
+}
+
+.menu {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.brand {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+/* The selector takes the remaining width so both labels stay reachable with a
+   thumb; it never grows past the bar. */
+.segmented {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-l2, rgb(127 127 127 / 12%));
+}
+
+.segment,
+.segmentActive {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: var(--dsw-alias-bg-l1, #fff);
+  font-weight: 600;
+}
+
+.segment:focus-visible,
+.segmentActive:focus-visible,
+.menu:focus-visible,
+.sheetClose:focus-visible,
+.row:focus-visible,
+.rowActive:focus-visible,
+.newIntake:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary, #4b6bfb);
+  outline-offset: 1px;
+}
+
+/* The record layer: below the bar, above the conversation. */
+.record {
+  position: fixed;
+  inset: 48px 0 0;
+  z-index: 35;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 14px;
+  background: var(--dsw-alias-bg-l1, #fff);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 35%);
+}
+
+.sheet {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(84vw, 320px);
+  padding: 14px;
+  background: var(--dsw-alias-bg-l1, #fff);
+  color: var(--dsw-alias-label-primary);
+  overflow-y: auto;
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheetTitle {
+  font-weight: 700;
+}
+
+.sheetClose {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.newIntake {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--dsw-alias-brand-primary, #4b6bfb);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row,
+.rowActive {
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowActive {
+  background: var(--dsw-alias-bg-l2, rgb(127 127 127 / 12%));
+  box-shadow: inset 2px 0 0 var(--dsw-alias-brand-primary, #4b6bfb);
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}

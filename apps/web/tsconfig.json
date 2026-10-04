@@ -24,6 +24,7 @@
   "exclude": [
     "tests/default-product-isolation.e2e.ts",
     "tests/medharness-visual.e2e.ts",
+    "tests/medharness-generic-regression.e2e.ts",
     "tests/diff-context.e2e.ts",
     "tests/scaffold.ts",
     "tests/auto-review-fixture.ts",

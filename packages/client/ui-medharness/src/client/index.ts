@@ -32,6 +32,8 @@ import type {} from '@deepseek-ai/dsh-medical-case/client'
 import type {} from '@deepseek-ai/dsh-medical-image/client'
 import { en, zh } from './locales.ts'
 import { MedharnessIntake } from './MedharnessIntake.tsx'
+import { MedharnessMobile } from './MedharnessMobile.tsx'
+import type { MedharnessMobileProps } from './MedharnessMobile.tsx'
 import { MedharnessHeroCopy, MedharnessHeroMark } from './MedharnessHero.tsx'
 import { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
 import type {} from './slots.ts'
@@ -45,6 +47,8 @@ export type { ImageObservationsProps } from './ImageObservations.tsx'
 export { PatientReport } from './PatientReport.tsx'
 export { ImageObservations } from './ImageObservations.tsx'
 export { MedharnessIntake } from './MedharnessIntake.tsx'
+export { MedharnessMobile, NARROW_MAX_WIDTH } from './MedharnessMobile.tsx'
+export type { MedharnessMobileProps, MedharnessSurface } from './MedharnessMobile.tsx'
 export { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
 export { MedharnessHeroCopy, MedharnessHeroMark } from './MedharnessHero.tsx'
 export type { MedharnessHeroCopyProps } from './MedharnessHero.tsx'
@@ -160,6 +164,30 @@ export function apply(ctx: ClientContext): void {
     () => ctx.locale.bind(NS)('composer.placeholder'),
     SHELL_PRIORITY,
   ), 'ui-medharness: composer placeholder')
+
+  // The narrow surface. It registers into the composer dock because that is a
+  // SESSION-scoped seat that survives at every width: a phone has no third
+  // column, so the record panel needs a seat the frame still renders. Its
+  // occupant draws nothing above the breakpoint, which is what keeps the
+  // desktop layout untouched.
+  const sidebarFace = () => ({
+    sessions: ctx.sessions.list,
+    createIntake: async () => String(await ctx.sessions.create()),
+    openIntake: (id: string) => { ctx.sessions.open(id as SessionId) },
+  })
+  ctx.effect(() => ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'medharness-mobile',
+    order: 100,
+    locale: NS,
+    inject: (): Pick<MedharnessMobileProps, 'loadImage' | 'sessions' | 'createIntake' | 'openIntake'> => ({
+      loadImage: (ref: MedharnessImageRef) => ctx.uiConversation.imageUrl(
+        ctx.sessions.list.getSnapshot().current as SessionId,
+        ref as unknown as Parameters<typeof ctx.uiConversation.imageUrl>[1],
+      ),
+      ...sidebarFace(),
+    }),
+  }, MedharnessMobile)), 'ui-medharness: narrow surface')
 
   // The agent-preset control is a development choice — which tool surface the
   // agent runs — and an intake never asks it, so the seat renders nothing.
