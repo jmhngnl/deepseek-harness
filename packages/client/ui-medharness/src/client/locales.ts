@@ -22,6 +22,18 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Simplified Chinese dictionary and key-set source of truth. */
 export const zh = {
+  'brand.name': 'MedHarness',
+  'brand.tagline': 'AI 就诊前信息采集',
+  'action.newIntake': '+ 新建接诊',
+  'action.creating': '正在创建接诊…',
+  'recent.title': '最近接诊',
+  'recent.loading': '正在加载接诊…',
+  'recent.empty': '还没有历史接诊。',
+  'recent.emptyAction': '开始第一次接诊',
+  'error.create': '无法创建新的接诊。',
+  'error.list': '无法加载最近的接诊。',
+  'time.today': '今天',
+  'time.yesterday': '昨天',
   'type.label': '接诊记录',
   'guide.title': '接诊记录',
   'guide.description': '查看本次问诊已记录的信息与图像观察',
@@ -58,6 +70,18 @@ export type MedharnessKey = keyof typeof zh
 
 /** English dictionary, checked against the Chinese key set. */
 export const en = {
+  'brand.name': 'MedHarness',
+  'brand.tagline': 'AI-assisted pre-consultation intake',
+  'action.newIntake': '+ New Intake',
+  'action.creating': 'Creating intake…',
+  'recent.title': 'Recent Intakes',
+  'recent.loading': 'Loading intakes…',
+  'recent.empty': 'No previous intakes yet.',
+  'recent.emptyAction': 'Start your first intake',
+  'error.create': 'Unable to create a new intake.',
+  'error.list': 'Unable to load recent intakes.',
+  'time.today': 'Today',
+  'time.yesterday': 'Yesterday',
   'type.label': 'Intake',
   'guide.title': 'Intake record',
   'guide.description': 'See what this consultation has recorded so far, and what the images showed',

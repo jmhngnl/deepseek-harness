@@ -15,16 +15,16 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { MedicalCaseWireView } from '@deepseek-ai/dsh-medical-case/client'
 import type { MedicalImageWireView } from '@deepseek-ai/dsh-medical-image/client'
 import { ImageObservations } from '../src/client/ImageObservations.tsx'
-import { MedharnessBody } from '../src/client/MedharnessBody.tsx'
 import { PatientReport } from '../src/client/PatientReport.tsx'
-import type { MedharnessBodyProps } from '../src/client/MedharnessBody.tsx'
+import { MedharnessIntake } from '../src/client/MedharnessIntake.tsx'
+import type { MedharnessIntakeProps } from '../src/client/MedharnessIntake.tsx'
 import { zh } from '../src/client/locales.ts'
 
 const t = makeTranslate(zh)
 
-// The tab runtime seat is framework-injected and never touched here, so one
-// documented cast keeps the harness to the props these cases actually exercise.
-const seat = {} as unknown as MedharnessBodyProps
+// The column seat is framework-injected and never touched here, so one
+// documented cast keeps the harness to the props these cases exercise.
+const seat = {} as unknown as MedharnessIntakeProps
 
 // The suite runs without globals, so testing-library's automatic cleanup is not
 // installed: without this, every render stays in the document and a role query
@@ -158,7 +158,7 @@ describe('image observations', () => {
 
 describe('the intake surface', () => {
   it('keeps the two kinds of evidence in separate, labelled panels', () => {
-    render(<MedharnessBody
+    render(<MedharnessIntake
       {...seat}
       useProjection={useProjectionOf({ medicalCase: AFTER_FOLLOW_UP, medicalImage: OBSERVED })}
       t={t}
@@ -180,19 +180,19 @@ describe('the intake surface', () => {
 
   it('renders the same state a reload would, because both values are projections', () => {
     const values = { medicalCase: AFTER_FOLLOW_UP, medicalImage: OBSERVED }
-    const first = render(<MedharnessBody {...seat} useProjection={useProjectionOf(values)} t={t} />)
+    const first = render(<MedharnessIntake {...seat} useProjection={useProjectionOf(values)} t={t} />)
     const firstText = first.container.textContent
     first.unmount()
 
     // Re-mounting with the value the host re-publishes on resume is the reload
     // path: nothing is kept in component state, so the page is a pure function
     // of the projections.
-    const second = render(<MedharnessBody {...seat} useProjection={useProjectionOf(values)} t={t} />)
+    const second = render(<MedharnessIntake {...seat} useProjection={useProjectionOf(values)} t={t} />)
     expect(second.container.textContent).toBe(firstText)
   })
 
   it('renders an empty intake without inventing evidence', () => {
-    render(<MedharnessBody
+    render(<MedharnessIntake
       {...seat}
       useProjection={useProjectionOf({ medicalCase: null, medicalImage: { observations: [] } })}
       t={t}
@@ -202,7 +202,7 @@ describe('the intake surface', () => {
   })
 
   it('shows a plain loading line while a projection value has not arrived', () => {
-    render(<MedharnessBody {...seat} useProjection={useProjectionOf({})} t={t} />)
+    render(<MedharnessIntake {...seat} useProjection={useProjectionOf({})} t={t} />)
     expect(screen.getAllByText('正在读取…')).toHaveLength(2)
   })
 })

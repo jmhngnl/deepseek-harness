@@ -1,0 +1,58 @@
+/* The product shell's right column: the intake record, always on screen.
+ *
+ * It occupies the frame's own right track, so the frame's concession solve
+ * already decided it fits. Two sections stack in one scroller; the accent on
+ * each heading is the same evidence distinction the panels draw, kept here so
+ * the two headings read as a pair from across the page. */
+
+.column {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 16px 14px 20px;
+  border-left: 0.5px solid var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.55;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Patient-reported: the calm, factual accent. */
+.section[data-evidence='patient-reported'] .head {
+  border-left: 3px solid var(--dsw-alias-brand-primary, #4b6bfb);
+}
+
+/* Model-observed: a visibly different accent, because it is different evidence. */
+.section[data-evidence='model-observed'] .head {
+  border-left: 3px solid var(--dsw-alias-accent-amber, #c2820a);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.headCaption {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}

@@ -229,6 +229,69 @@ describe('profile registration', () => {
   })
 })
 
+// ── Product UI isolation between the two Web surfaces ───────────────────────
+
+describe('product UI profile isolation', () => {
+  /**
+   * Every row a profile actually resolves, in layer order.
+   *
+   * This reads the loader's own composition rather than the bundle's YAML: the
+   * profile reader has already resolved each bundle package, read its patch
+   * file, and parsed it into patch options. A test that grepped one patch file
+   * would pass even if the row never reached a profile that mounts that bundle.
+   * @param profileName - shipped profile template to resolve.
+   * @returns the composed row list across every bundle layer, typed as the loader
+   *   types it: a patch entry is not the same shape as a bundle-declared row.
+   */
+  function composedRows(profileName: string): LoaderRow[] {
+    const profile = loadProfile(
+      `medharness-isolation-${profileName}`,
+      profileName,
+      INSTALL_ANCHOR,
+      undefined,
+      { userLayer: false },
+    )
+    return profile.layers.flatMap(layer => layer.patches).flatMap(patch => patch.insert ?? [])
+  }
+
+  /**
+   * One row as the loader resolves it. Derived rather than imported: a patch
+   * entry is the loader own shape, and this test reads the loader composition.
+   */
+  type LoaderRow = NonNullable<ReturnType<typeof loadProfile>['layers'][number]['patches'][number]['insert']>[number]
+
+  /** The bundle's own row set, from the patch the loader reads. */
+  const PRODUCT_UI = '@deepseek-ai/dsh-client-ui-medharness'
+
+  it('mounts the product UI on medharness-web and nowhere else', () => {
+    const web = composedRows('web')
+    const medharnessWeb = composedRows('medharness-web')
+
+    // The generic Web surface is base + web-app: a coding agent's browser
+    // client, with no medical product in it.
+    expect(web.map(row => row.name)).not.toContain(PRODUCT_UI)
+    // The medical Web surface adds it, so a person opening that profile gets
+    // the intake column rather than the harness navigation.
+    expect(medharnessWeb.map(row => row.name)).toContain(PRODUCT_UI)
+  })
+
+  it('mounts the product UI exactly once, after the surfaces it depends on', () => {
+    const rows = composedRows('medharness-web')
+    const productRows = rows.filter(row => row.name === PRODUCT_UI)
+    expect(productRows).toHaveLength(1)
+
+    // The column registers into slots the frame declares, so the frame's own
+    // row must be composed before it in layer order.
+    const layerNames = loadProfile(
+      'medharness-isolation-order', 'medharness-web', INSTALL_ANCHOR, undefined, { userLayer: false },
+    ).layers.map(layer => layer.packageName)
+    const frame = layerNames.indexOf('@deepseek-ai/dsh-web-app')
+    const surface = layerNames.indexOf('@deepseek-ai/dsh-medharness')
+    expect(frame).toBeGreaterThanOrEqual(0)
+    expect(surface).toBeGreaterThan(frame)
+  })
+})
+
 // ── The preset the Web surface resolves ─────────────────────────────────────
 
 describe('medical agent preset', () => {

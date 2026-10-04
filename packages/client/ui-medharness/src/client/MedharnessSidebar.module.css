@@ -1,0 +1,177 @@
+/* The product navigation column: brand, the one action, and what came before.
+ *
+ * It occupies the frame's left track, so the frame's collapse control still
+ * works: `collapsed` renders the mark alone. Nothing here is a developer
+ * control, and the column deliberately has no second level of navigation —
+ * a person's own intakes are the whole map. */
+
+.column {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 18px 14px;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.5;
+}
+
+/* Collapsed: the frame's 56px rail, carrying the mark only. */
+.rail {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 18px;
+  box-sizing: border-box;
+}
+
+.railMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--dsw-alias-brand-primary, #4b6bfb);
+  color: #fff;
+  font-weight: 700;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brandName {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brandTagline {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.primary,
+.secondary {
+  font: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primary {
+  padding: 8px 12px;
+  border: none;
+  background: var(--dsw-alias-brand-primary, #4b6bfb);
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+}
+
+.primary:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.secondary {
+  padding: 6px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  background: transparent;
+  color: inherit;
+}
+
+.secondary:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.recentTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row,
+.rowActive {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-bg-l2, rgb(127 127 127 / 10%));
+}
+
+/* The current intake reads as selected without relying on colour alone: the
+   accent bar survives a monochrome screen and a colour-blind reader. */
+.rowActive {
+  background: var(--dsw-alias-bg-l2, rgb(127 127 127 / 12%));
+  box-shadow: inset 2px 0 0 var(--dsw-alias-brand-primary, #4b6bfb);
+}
+
+.rowTime {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 11px;
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  color: var(--dsw-alias-accent-amber, #c2820a);
+  font-size: 12px;
+}
