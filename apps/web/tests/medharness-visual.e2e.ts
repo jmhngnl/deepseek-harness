@@ -13,9 +13,10 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
-import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
+import { mkdirSync } from 'node:fs'
+import { ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 
 const OVERLAY = fileURLToPath(new URL('./medharness-visual.overlay.yml', import.meta.url))
 const SHOT_DIR = fileURLToPath(new URL('../../../.artifacts/screenshots/medharness-visual', import.meta.url))
@@ -51,7 +52,20 @@ describe('web e2e: MedHarness product surface, photographed', () => {
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
+    // The shipped connect helper waits on the coding placeholder attribute,
+    // which this composition deliberately replaces. The steps are the same;
+    // only the final wait is written against the composer itself, so this case
+    // does not depend on the very string it exists to change.
+    mkdirSync(join(scaffold.workspaceCwd, 'workspace'), { recursive: true })
+    await page.getByRole('textbox', { name: '选择工作区' }).click()
+    const picker = page.getByRole('dialog', { name: '选择工作区目录' })
+    await picker.waitFor({ timeout: 10_000 })
+    await picker.getByRole('button', { name: '编辑路径' }).click()
+    const pathInput = picker.getByRole('textbox', { name: '编辑路径' })
+    await pathInput.fill(join(scaffold.workspaceCwd, 'workspace'))
+    await pathInput.press('Enter')
+    await picker.getByRole('button', { name: '打开', exact: true }).click()
+    await page.locator('[data-composer-input][contenteditable="true"]').waitFor({ timeout: 15_000 })
   }, 180_000)
 
   afterAll(async () => {
@@ -74,6 +88,21 @@ describe('web e2e: MedHarness product surface, photographed', () => {
     if (await row.count() > 0) {
       await row.click()
       await page.waitForTimeout(1500)
+    }
+
+    // What the product must show, and what it must no longer show. Asserted
+    // against the live DOM rather than only photographed, so a regression
+    // fails the run instead of quietly appearing in a screenshot.
+    const composer = page.locator('[data-composer-input][contenteditable="true"]')
+    await expect.poll(async () => await composer.getAttribute('data-placeholder'), { timeout: 15_000 })
+      .toContain('描述症状或补充信息')
+    const rendered = (await page.locator('body').innerText())
+      .concat(await composer.getAttribute('data-placeholder') ?? '')
+    for (const present of ['MedHarness', '开始本次信息采集', '描述症状或补充信息']) {
+      expect(rendered, `the product surface must show ${present}`).toContain(present)
+    }
+    for (const gone of ['探索未至之境', '描述你想要构建的内容', '/ 调用指令', '@ 文件或对话', '标准模式']) {
+      expect(rendered, `the product surface must not show ${gone}`).not.toContain(gone)
     }
 
     for (const viewport of VIEWPORTS) {

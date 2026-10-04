@@ -149,11 +149,19 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
               fallback: <HeroFish hovering={hovering} />,
             })}
           </span>
-          <span className={css.titleGroup}>
-            {/* Own element: keeps the headline text addressable apart from the badge. */}
-            <span>{t('hero.headline')}</span>
-            <span className={css.previewBadge}>{t('hero.preview')}</span>
-          </span>
+          {/* The headline block is a seat whose fallback is the shipped words,
+              so a composition that registers nothing renders exactly what it
+              rendered before this seat existed. A vertical product shadows it
+              to introduce itself in its own terms. */}
+          {renderSlot('conversation.hero.copy', { headline: t('hero.headline'), badge: t('hero.preview') }, {
+            fallback: (
+              <span className={css.titleGroup}>
+                {/* Own element: keeps the headline text addressable apart from the badge. */}
+                <span>{t('hero.headline')}</span>
+                <span className={css.previewBadge}>{t('hero.preview')}</span>
+              </span>
+            ),
+          })}
         </div>
         <div className={css.body}>
           {/* The composer remains mounted outside this component. */}

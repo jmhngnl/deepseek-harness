@@ -32,6 +32,7 @@ import type {} from '@deepseek-ai/dsh-medical-case/client'
 import type {} from '@deepseek-ai/dsh-medical-image/client'
 import { en, zh } from './locales.ts'
 import { MedharnessIntake } from './MedharnessIntake.tsx'
+import { MedharnessHeroCopy, MedharnessHeroMark } from './MedharnessHero.tsx'
 import { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
 import type {} from './slots.ts'
 import { MedharnessSidebar } from './MedharnessSidebar.tsx'
@@ -45,6 +46,9 @@ export { PatientReport } from './PatientReport.tsx'
 export { ImageObservations } from './ImageObservations.tsx'
 export { MedharnessIntake } from './MedharnessIntake.tsx'
 export { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
+export { MedharnessHeroCopy, MedharnessHeroMark } from './MedharnessHero.tsx'
+export type { MedharnessHeroCopyProps } from './MedharnessHero.tsx'
+export type { MedharnessHeroMarkProps } from './MedharnessHero.tsx'
 export type { MedharnessRightbarRootProps } from './MedharnessRightbarRoot.tsx'
 export type { MedharnessImageLoader, MedharnessImageRef } from './slots.ts'
 export { MedharnessSidebar } from './MedharnessSidebar.tsx'
@@ -64,6 +68,15 @@ const SHELL_PRIORITY = -1
 
 /** Required browser services: the slot registry and copy. */
 export const inject = ['slots', 'locale', 'sessions', 'uiConversation', 'layout']
+
+/**
+ * Client plugin body: take the frame's right column for the intake record.
+ * @param ctx - client root context carrying the slot registry and copy.
+ */
+/** A seat the product claims and leaves empty. */
+function EmptySeat(): null {
+  return null
+}
 
 /**
  * Client plugin body: take the frame's right column for the intake record.
@@ -116,6 +129,52 @@ export function apply(ctx: ClientContext): void {
     ctx.layout.openRightbar(true, false)
     return () => { ctx.layout.closeRightbar() }
   }, 'ui-medharness: right track')
+
+  // ── The blank-intake hero ────────────────────────────────────────────────
+  //
+  // Three single seats the shipped hero occupies. Taking them at a lower
+  // priority is the same shadow the right column uses: the generic Web profile
+  // keeps every one of its own occupants, and this profile shows the product a
+  // person actually opened.
+  ctx.effect(() => ctx.slots.inject('conversation.hero.brand.mark', () => ctx.slots.register({
+    name: 'conversation.hero.brand.mark',
+    priority: SHELL_PRIORITY,
+    locale: NS,
+  }, MedharnessHeroMark)), 'ui-medharness: hero mark')
+
+  // The headline the shipped hero shows is the harness vendor introducing a
+  // coding agent. This seat is the generic seam a vertical product uses to
+  // introduce itself instead; the Conversation underneath is untouched.
+  ctx.effect(() => ctx.slots.inject('conversation.hero.copy', () => ctx.slots.register({
+    name: 'conversation.hero.copy',
+    priority: SHELL_PRIORITY,
+    locale: NS,
+  }, MedharnessHeroCopy)), 'ui-medharness: hero copy')
+
+  // The composer placeholder is a DOM attribute, so it is a string rather than
+  // a slot. The shipped text — which carries the coding surface's slash and @
+  // hints inside the same string — arrives as the argument and is replaced
+  // wholesale, which is why no separate hint switch exists: there is nothing
+  // left to switch off once the string is gone.
+  ctx.effect(() => ctx.uiConversation.presentation.registerPlaceholder(
+    () => ctx.locale.bind(NS)('composer.placeholder'),
+    SHELL_PRIORITY,
+  ), 'ui-medharness: composer placeholder')
+
+  // The agent-preset control is a development choice — which tool surface the
+  // agent runs — and an intake never asks it, so the seat renders nothing.
+  //
+  // The workspace picker is deliberately NOT shadowed, though the product
+  // never asks the question either. It is the only first-run path that
+  // establishes a workspace for a fresh installation; removing it left the
+  // browser acceptance unable to connect a workspace at all. A product control
+  // that onboarding depends on stays until something else owns that step.
+  for (const seat of ['conversation.hero.agentPreset'] as const) {
+    ctx.effect(() => ctx.slots.inject(seat, () => ctx.slots.register({
+      name: seat,
+      priority: SHELL_PRIORITY,
+    }, EmptySeat)), `ui-medharness: empty ${seat}`)
+  }
 
   // The navigation column, replaced outright. Workspaces, files, terminals,
   // jobs, settings, and the developer seats are not hidden here — they are not

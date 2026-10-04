@@ -157,6 +157,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
     /** Workspace picker shown by the blank-session Hero. */
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
+    /**
+     * The blank-session headline block: the words a deployment uses to
+     * introduce itself. The shipped occupant is the fallback, so a composition
+     * that registers nothing keeps the current headline and badge exactly; a
+     * vertical product shadows the seat to speak in its own terms while the
+     * Conversation runtime underneath is untouched.
+     */
+    'conversation.hero.copy': { kind: 'single'; scope: 'root'; owner: HeroCopyOwnerProps }
     /** Brand mark shown before the blank-session headline. */
     'conversation.hero.brand.mark': { kind: 'single'; scope: 'root'; owner: HeroBrandMarkOwnerProps }
     /** Agent-preset control staged for a New Session. */
@@ -262,6 +270,11 @@ export type ConvViewProps = PropsRuntime<'conversation.view'>
 export interface ConversationInjected {
   /** Connect and open a blank Session in the selected Workspace. */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
+  /**
+   * Resolve the hero placeholder a composer should show. The shipped text is
+   * the argument, so a caller never has to know whether anything replaced it.
+   */
+  resolvePlaceholder: (shipped: string) => string
   /** Session-addressed composer block source, or the stable absent source. */
   hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
 }
@@ -357,6 +370,21 @@ export interface ComposerChainProps {
 }
 
 /** Presentation props supplied to the blank-session brand mark. */
+/**
+ * Owner share of the blank-session headline block.
+ *
+ * The shipped strings arrive already translated rather than as a translate
+ * function: an occupant replaces the words, and handing it the namespace would
+ * also hand it the ability to reach every other key in it.
+ */
+export interface HeroCopyOwnerProps {
+  /** The shipped headline, as this composition would have rendered it. */
+  readonly headline: string
+  /** The shipped preview badge, or an empty string when the build shows none. */
+  readonly badge: string
+}
+
+/** Owner share of the brand mark before the headline. */
 export interface HeroBrandMarkOwnerProps {
   /** Requested square edge in pixels. */
   size: number
@@ -371,6 +399,7 @@ export type ConversationSlotProps =
     | 'conversation.session' | 'conversation.session.header'
     | 'conversation.composer' | 'conversation.composer.bar'
     | 'conversation.input.dock'
+    | 'conversation.hero.copy'
     | 'conversation.hero.brand.mark'
     | 'conversation.hero.workspace'
     | 'conversation.hero.agentPreset'

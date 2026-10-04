@@ -108,7 +108,7 @@ function WidthHandle(props: {
  */
 export function ConversationContent({
   sessionId, session, phase, hero, useSessions, useSessionPendingInteraction,
-  useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
+  useWorkspaces, useInput, useComposerBlock, resolvePlaceholder, renderSlot, renderSlotChain,
   selectWorkspace, t, onHandleStart, onHandleDrag, onHandleCommit, onHandleEnd,
 }: ConversationContentProps) {
   const pendingInteraction = useSessionPendingInteraction(snapshot =>
@@ -234,7 +234,9 @@ export function ConversationContent({
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') } : {}),
+        // The shipped text is the argument: with no registration the resolver
+        // returns exactly what this surface showed before the seam existed.
+        : hero ? { placeholder: resolvePlaceholder(t('placeholder.hero')) } : {}),
   })
 
   const composerBar = (

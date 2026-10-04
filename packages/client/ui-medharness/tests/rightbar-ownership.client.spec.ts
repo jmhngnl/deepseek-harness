@@ -77,7 +77,13 @@ async function boot() {
   const openRightbar = vi.fn()
   const closeRightbar = vi.fn()
   const sessions = { list: { getSnapshot: () => ({ current: undefined }) } }
-  const uiConversation = { imageUrl: vi.fn(async () => 'blob:x') }
+  // The disposer the registry hands back; the case below proves teardown runs it.
+  const releasePlaceholder = vi.fn()
+  const registerPlaceholder = vi.fn((_resolve: (shipped: string) => string, _priority?: number) => releasePlaceholder)
+  const uiConversation = {
+    imageUrl: vi.fn(async () => 'blob:x'),
+    presentation: { registerPlaceholder },
+  }
 
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
@@ -87,7 +93,7 @@ async function boot() {
 
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { registered, openRightbar, closeRightbar, fiber }
+  return { registered, openRightbar, closeRightbar, registerPlaceholder, releasePlaceholder, fiber }
 }
 
 describe('ui-medharness rightbar ownership', () => {
@@ -143,6 +149,26 @@ describe('ui-medharness rightbar ownership', () => {
     expect(registered.length).toBeGreaterThan(0)
     await fiber.dispose()
     expect(registered).toEqual([])
+  })
+
+  it('registers its composer placeholder through the presentation resolver', async () => {
+    const { registerPlaceholder } = await boot()
+    // The placeholder is a DOM attribute, so it cannot ride a slot; the
+    // resolver is the string half of the same shadow, and it must be claimed
+    // below the shipped band for the product's text to win.
+    expect(registerPlaceholder).toHaveBeenCalledTimes(1)
+    expect(registerPlaceholder.mock.calls[0]?.[1]).toBe(-1)
+  })
+
+  it('releases its presentation claim when the plugin goes', async () => {
+    const { registerPlaceholder, releasePlaceholder, fiber } = await boot()
+    expect(registerPlaceholder).toHaveBeenCalledTimes(1)
+    expect(releasePlaceholder).not.toHaveBeenCalled()
+
+    await fiber.dispose()
+    // A presentation override must not outlive the plugin that made it: the
+    // next composition mounted over this Context gets the shipped text back.
+    expect(releasePlaceholder).toHaveBeenCalledTimes(1)
   })
 
   it('asks nothing of the shipped right Sidebar', () => {

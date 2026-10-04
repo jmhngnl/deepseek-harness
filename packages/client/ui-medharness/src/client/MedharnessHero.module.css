@@ -1,0 +1,34 @@
+/* The hero's mark seat, taken by the product wordmark.
+ *
+ * The seat is sized for a glyph; a wordmark needs to sit in it without
+ * changing the row's height, so the line box is what carries the size and the
+ * mark itself adds no vertical padding. */
+.mark {
+  display: inline-block;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The blank-intake headline block: this product's own words, in the seat the
+   shipped headline occupies. The block is a column so the supporting line sits
+   under the headline rather than beside it. */
+.copy {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.copyHeadline {
+  font-size: 1.35em;
+  font-weight: 600;
+}
+
+.copyBody {
+  max-width: 34em;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 0.62em;
+  line-height: 1.6;
+}

@@ -21,6 +21,7 @@ import { inspectSystemPrompt, type SystemPromptState } from '../contract/system-
 import { ConversationNodeAssembler } from './assembler.ts'
 import { ConversationEventRegistry } from './event-registry.ts'
 import { HistoricalImageCache } from './historical-images.ts'
+import { ConversationPresentation } from './presentation.ts'
 import { ConversationViewRegistry } from './view-registry.ts'
 
 /** Observable faces published for one Session's Conversation assembly. */
@@ -177,6 +178,8 @@ export class UiConversation extends Service {
   readonly events: ConversationEventRegistry
   /** Registry of target View definitions. */
   readonly views: ConversationViewRegistry
+  /** Primitive-string presentation resolvers (placeholder text and its kin). */
+  readonly presentation: ConversationPresentation
   private readonly bindings = new Map<SessionId, BindingRecord>()
   private readonly images: HistoricalImageCache
 
@@ -188,6 +191,7 @@ export class UiConversation extends Service {
     super(ctx, 'uiConversation')
     this.events = new ConversationEventRegistry(ctx)
     this.views = new ConversationViewRegistry(ctx)
+    this.presentation = new ConversationPresentation(ctx)
     this.images = new HistoricalImageCache(ctx, sessions)
     const rebuild = (): void => {
       for (const record of this.bindings.values()) record.binding.rebuild()

@@ -184,6 +184,9 @@ function mount(
       seatOwners.push({ key, owner })
     }
     if (key === 'conversation.hero.workspace') { pickerOwner = owner; return null }
+    // The headline seat's fallback IS the shipped headline, so a harness that
+    // swallows it would erase the text these cases assert.
+    if (key === 'conversation.hero.copy') return opts?.fallback ?? null
     if (key === 'conversation.session.header.lineage') {
       lineageOwners.push(owner as ConversationHeaderLineageOwnerProps)
       return opts?.fallback ?? null
@@ -313,6 +316,9 @@ function mount(
     renderSlot,
     renderSlotChain,
     selectWorkspace: retargetWorkspace,
+    // The harness registers no presentation resolver, so the shipped text comes
+    // back unchanged — which is the generic composition this file describes.
+    resolvePlaceholder: shipped => shipped,
     t,
   }
   const view = render(<ConversationRoot {...props} />)
@@ -325,12 +331,20 @@ function mount(
 
 describe('Hero chrome', () => {
   it('renders the English preview badge through the hero locale seat', () => {
-    const renderSlot = vi.fn<HeroShellProps['renderSlot']>(() => null)
+    // The mock honors the fallback contract the real renderer honors: the
+    // shipped headline IS a fallback now, so a mock that always returns null
+    // would erase the very text this case asserts.
+    const renderSlot = vi.fn<HeroShellProps['renderSlot']>((_key, _owner, opts) => opts?.fallback ?? null)
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
     expect(view.getByText('Into the Unknown')).toBeTruthy()
     expect(view.getByText('Preview')).toBeTruthy()
-    expect(renderSlot).toHaveBeenCalledOnce()
-    expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
+    // Two seats now: the brand mark and the headline block. The headline
+    // text above came through the copy seat's fallback, which is what proves
+    // the seat is inert for a composition that registers nothing.
+    expect(renderSlot).toHaveBeenCalledTimes(2)
+    expect(renderSlot.mock.calls.map(call => call[0]))
+      .toEqual(['conversation.hero.brand.mark', 'conversation.hero.copy'])
+    expect(renderSlot.mock.calls[1]?.[1]).toEqual({ headline: 'Into the Unknown', badge: 'Preview' })
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
     if (brandMarkOwner === undefined || !('size' in brandMarkOwner) || !('className' in brandMarkOwner)) {
       throw new Error('hero brand-mark owner must provide size and className')

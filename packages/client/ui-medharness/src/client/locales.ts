@@ -24,6 +24,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const zh = {
   'brand.name': 'MedHarness',
   'brand.tagline': 'AI 就诊前信息采集',
+  'hero.headline': '开始本次信息采集',
+  'hero.body': '请描述本次需要记录的症状或情况。也可以上传图片补充信息。',
+  'composer.placeholder': '描述症状或补充信息……',
   'action.newIntake': '+ 新建接诊',
   'action.creating': '正在创建接诊…',
   'recent.title': '最近接诊',
@@ -74,6 +77,9 @@ export type MedharnessKey = keyof typeof zh
 export const en = {
   'brand.name': 'MedHarness',
   'brand.tagline': 'AI-assisted pre-consultation intake',
+  'hero.headline': 'Start your intake',
+  'hero.body': 'Tell me about the symptoms or concerns you would like to record before your visit. You can also attach an image.',
+  'composer.placeholder': 'Describe your symptoms or add information...',
   'action.newIntake': '+ New Intake',
   'action.creating': 'Creating intake…',
   'recent.title': 'Recent Intakes',
