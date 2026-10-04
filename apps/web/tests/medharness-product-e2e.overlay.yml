@@ -1,0 +1,58 @@
+# Populated product E2E: the MedHarness product over the generic Web tree, with
+# a hand-written model.
+#
+# Only the model is scripted. Everything below the `llm-scripted` row is the
+# real thing: the agent loop, the tool registry, the medical domain, the
+# session events, the projection, and the wire the browser reads. The script
+# below is therefore a model's DECISIONS, not an outcome — the case calls the
+# real tools and the real domain decides what the record becomes.
+#
+# The default-model row is restated so the agent selects the scripted route.
+# It is applied after the scaffold's own row, so this is the one in force.
+
+- id: agent-default-model
+  config:
+    provider: medharness-e2e
+    model: scripted
+
+- insert:
+    # ── The medical runtime ─────────────────────────────────────────────────
+    - id: medical-case
+      name: '@deepseek-ai/dsh-medical-case'
+    - id: medical-image
+      name: '@deepseek-ai/dsh-medical-image'
+    # The two tools this scenario drives. Registered for real, so the model's
+    # arguments are validated by the same schema a deployment would use.
+    - id: tool-medical-case-intake
+      name: '@deepseek-ai/dsh-tool-medical-case-intake'
+    - id: tool-medical-case-update
+      name: '@deepseek-ai/dsh-tool-medical-case-update'
+
+    # ── The product surface ─────────────────────────────────────────────────
+    - id: ui-medharness
+      name: '@deepseek-ai/dsh-client-ui-medharness'
+
+    # ── The scripted model (the only mock in this composition) ──────────────
+    #
+    # One entry per model call, consumed in order. The tool results are real
+    # messages on the way back in, which is what makes the third and fourth
+    # entries a continuation rather than a claim.
+    - id: llm-scripted
+      name: '@deepseek-ai/dsh-llm-scripted'
+      config:
+        provider: medharness-e2e
+        model: scripted
+        steps:
+          # Turn 1: the user says "我头疼两天，还有点发烧".
+          - tool: medical_case_intake
+            args:
+              symptoms: ['头疼', '发烧']
+              duration: 两天
+          # Continuation after the real tool result: ask for what is missing.
+          - text: 请问您的年龄是多少？
+          # Turn 2: the user answers "25岁".
+          - tool: medical_case_update
+            args:
+              age: 25
+          # Continuation after the real tool result.
+          - text: 已记录，谢谢您。
