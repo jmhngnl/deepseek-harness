@@ -19,6 +19,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the renderer-owned slots service and its Context merge.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard kit the column seat receives.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -31,6 +32,8 @@ import type {} from '@deepseek-ai/dsh-medical-case/client'
 import type {} from '@deepseek-ai/dsh-medical-image/client'
 import { en, zh } from './locales.ts'
 import { MedharnessIntake } from './MedharnessIntake.tsx'
+import { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
+import type {} from './slots.ts'
 import { MedharnessSidebar } from './MedharnessSidebar.tsx'
 import type { MedharnessSidebarInjected } from './MedharnessSidebar.tsx'
 import type { MedharnessImageLoader, MedharnessImageRef } from './slots.ts'
@@ -41,6 +44,9 @@ export type { ImageObservationsProps } from './ImageObservations.tsx'
 export { PatientReport } from './PatientReport.tsx'
 export { ImageObservations } from './ImageObservations.tsx'
 export { MedharnessIntake } from './MedharnessIntake.tsx'
+export { MedharnessRightbarRoot } from './MedharnessRightbarRoot.tsx'
+export type { MedharnessRightbarRootProps } from './MedharnessRightbarRoot.tsx'
+export type { MedharnessImageLoader, MedharnessImageRef } from './slots.ts'
 export { MedharnessSidebar } from './MedharnessSidebar.tsx'
 export type { MedharnessSidebarInjected, MedharnessSidebarProps } from './MedharnessSidebar.tsx'
 export type { MedharnessIntakeProps } from './MedharnessIntake.tsx'
@@ -57,7 +63,7 @@ const NS = 'medharness'
 const SHELL_PRIORITY = -1
 
 /** Required browser services: the slot registry and copy. */
-export const inject = ['slots', 'locale', 'sessions', 'uiConversation']
+export const inject = ['slots', 'locale', 'sessions', 'uiConversation', 'layout']
 
 /**
  * Client plugin body: take the frame's right column for the intake record.
@@ -65,25 +71,51 @@ export const inject = ['slots', 'locale', 'sessions', 'uiConversation']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-medharness: dictionaries')
-  // The frame's column is root-scoped and carries no session, so the content
-  // goes into the session-scoped seat inside it. Registering at a lower
-  // priority is the framework's documented way to shadow an occupied single
-  // slot: the shipped right Sidebar keeps its registration and never renders.
-  ctx.effect(() => ctx.slots.inject('rightbar.session', () => ctx.slots.register({
-    name: 'rightbar.session',
-    priority: SHELL_PRIORITY,
-    locale: NS,
-    inject: (): { loadImage: MedharnessImageLoader } => ({
-      // The same read the conversation's image bubbles use: authorization,
-      // caching, and URL lifetime stay in the Conversation service. The
-      // adapter widens the wire facts back into the branded reference the
-      // service takes, which is the one place both vocabularies are in scope.
-      loadImage: (ref: MedharnessImageRef) => ctx.uiConversation.imageUrl(
-        ctx.sessions.list.getSnapshot().current as SessionId,
-        ref as unknown as Parameters<typeof ctx.uiConversation.imageUrl>[1],
-      ),
-    }),
-  }, MedharnessIntake)), 'ui-medharness: intake column')
+
+  // The frame's right column, taken outright. Registering at a lower priority
+  // is the framework's documented way to shadow an occupied single slot: the
+  // shipped right Sidebar keeps its registration and never renders.
+  //
+  // The child seat is this package's OWN, not the one the shipped Sidebar
+  // declares. A child slot is rendered by whoever declared it, so borrowing
+  // `rightbar.session` would leave the intake record inside another plugin's
+  // visibility gate — which is exactly what happened before this change: the
+  // column was absent on every viewport because `ui-sidebar-right`'s own
+  // occupant decided not to render. Declaring the seat here means the column is
+  // present because MedHarness is mounted, and for no other reason.
+  ctx.effect(() => ctx.slots.inject('rightbar', function* () {
+    yield ctx.slots.register({
+      name: 'rightbar',
+      priority: SHELL_PRIORITY,
+      locale: NS,
+      children: { 'medharness.rightbar.session': { kind: 'single', scope: 'session' } },
+    }, MedharnessRightbarRoot)
+    yield ctx.slots.register({
+      name: 'medharness.rightbar.session',
+      locale: NS,
+      inject: (): { loadImage: MedharnessImageLoader } => ({
+        // The same read the conversation's image bubbles use: authorization,
+        // caching, and URL lifetime stay in the Conversation service. The
+        // adapter widens the wire facts back into the branded reference the
+        // service takes, which is the one place both vocabularies are in scope.
+        loadImage: (ref: MedharnessImageRef) => ctx.uiConversation.imageUrl(
+          ctx.sessions.list.getSnapshot().current as SessionId,
+          ref as unknown as Parameters<typeof ctx.uiConversation.imageUrl>[1],
+        ),
+      }),
+    }, MedharnessIntake)
+  }), 'ui-medharness: intake column')
+
+  // The column's WIDTH is a frame decision, not a slot decision: the frame
+  // reserves a right track only when something reports one open. Taking the
+  // slot without this leaves the occupant rendering inside a zero-width
+  // column — present in the tree, invisible on screen. Reporting the track open
+  // is what makes the intake record actually occupy space, and reporting it
+  // closed on teardown is what gives the width back.
+  ctx.effect(() => {
+    ctx.layout.openRightbar(true, false)
+    return () => { ctx.layout.closeRightbar() }
+  }, 'ui-medharness: right track')
 
   // The navigation column, replaced outright. Workspaces, files, terminals,
   // jobs, settings, and the developer seats are not hidden here — they are not

@@ -1,0 +1,15 @@
+# Visual-acceptance overlay: the MedHarness product surface over the generic Web
+# composition the scaffold boots.
+#
+# The scaffold composes `dsh-base` + `dsh-web-app`; this layer adds the medical
+# domains whose projections the product page reads, and the product surface
+# itself. It is deliberately NOT the whole `dsh-medharness` bundle: that bundle
+# is a standalone tree and its rows would collide with base's by id. A visual
+# case needs the two domains and the browser plugin, and nothing else.
+- insert:
+    - id: medical-case
+      name: '@deepseek-ai/dsh-medical-case'
+    - id: medical-image
+      name: '@deepseek-ai/dsh-medical-image'
+    - id: ui-medharness
+      name: '@deepseek-ai/dsh-client-ui-medharness'

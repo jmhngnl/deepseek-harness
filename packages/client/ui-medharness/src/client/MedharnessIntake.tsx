@@ -26,7 +26,7 @@ import css from './MedharnessShell.module.css'
 
 /** The intake content's props: the shell's session seat plus copy. */
 export type MedharnessIntakeProps =
-  & PropsRuntime<'rightbar.session'>
+  & PropsRuntime<'medharness.rightbar.session'>
   & PropsLocale<'medharness'>
   & { /** Session-authorized image URL resolution, injected by the plugin body. */ readonly loadImage: MedharnessImageLoader }
 
