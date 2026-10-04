@@ -17,6 +17,10 @@ import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+// Type-only: merges the `title` key into SessionProjectionMap for the label fallback.
+import type {} from '@deepseek-ai/dsh-session-title/client'
+// Type-only: merges the `title` key into SessionProjectionMap for the label fallback.
+import type {} from '@deepseek-ai/dsh-session-title/client'
 import type {} from './locales.ts'
 import css from './MedharnessSidebar.module.css'
 
@@ -60,6 +64,29 @@ export type MedharnessSidebarProps =
   & MedharnessSidebarInjected
   & PropsLocale<'medharness'>
 
+/**
+ * The label a person sees for one intake.
+ *
+ * The host composes `displayTitle` from the durable title, then the project
+ * basename, then the session id — so the last resort is an identifier, which is
+ * not a name. The title projection is the durable one the host derives from the
+ * first prompt; when it has not landed yet (or the row is a blank new intake),
+ * the row is simply unnamed. Nothing here calls a model or keeps a second title
+ * store: the three candidates are all values the host already published.
+ * @param row - one list row as the host published it.
+ * @param t - namespace-bound translate.
+ * @returns the label to draw, never a bare session id.
+ */
+function labelOf(row: SessionSummary, t: TranslateNS<'medharness'>): string {
+  const projected = row.projectionValues?.['title']
+  if (typeof projected === 'string' && projected.trim() !== '') return projected
+  const display = row.displayTitle
+  // `displayTitle` falls back to the session id; showing that to a person is
+  // worse than admitting the intake has no name yet.
+  if (display !== '' && display !== String(row.id)) return display
+  return t('recent.untitled')
+}
+
 /** Format one timestamp the way a person reads a schedule, not a log. */
 function when(updatedAt: number, t: TranslateNS<'medharness'>): string {
   const then = new Date(updatedAt)
@@ -88,7 +115,10 @@ export function MedharnessSidebar({
     () => sessions.getSnapshot(),
   )
   const [creating, setCreating] = useState(false)
-  const [failed, setFailed] = useState<'create' | 'list' | null>(null)
+  // Only the create call can fail in a way this column can report: the list is
+  // a store the host keeps, and its failure surface is not exposed here. A
+  // second branch for it would be a state no runtime signal can reach.
+  const [failed, setFailed] = useState(false)
   // React state disables the control on the NEXT render; the ref closes the
   // same-render window, so two clicks dispatched in one tick cannot both start
   // an intake. The state is still what the button reads.
@@ -100,10 +130,10 @@ export function MedharnessSidebar({
     if (inFlight.current) return
     inFlight.current = true
     setCreating(true)
-    setFailed(null)
+    setFailed(false)
     void createIntake().then(
       () => { inFlight.current = false; setCreating(false) },
-      () => { inFlight.current = false; setCreating(false); setFailed('create') },
+      () => { inFlight.current = false; setCreating(false); setFailed(true) },
     )
   }, [createIntake])
 
@@ -138,15 +168,13 @@ export function MedharnessSidebar({
         {creating ? t('action.creating') : t('action.newIntake')}
       </button>
 
-      {failed === 'create' ? <p className={css.error}>{t('error.create')}</p> : null}
+      {failed ? <p className={css.error}>{t('error.create')}</p> : null}
 
       <section className={css.recent}>
         <h2 className={css.recentTitle}>{t('recent.title')}</h2>
 
         {state.phase === 'pending' ? (
           <p className={css.hint}>{t('recent.loading')}</p>
-        ) : failed === 'list' ? (
-          <p className={css.error}>{t('error.list')}</p>
         ) : rows.length === 0 ? (
           <div className={css.empty}>
             <p className={css.hint}>{t('recent.empty')}</p>
@@ -166,7 +194,7 @@ export function MedharnessSidebar({
                   data-testid="intake-row"
                 >
                   <span className={css.rowTime}>{when(row.updatedAt, t)}</span>
-                  <span className={css.rowTitle}>{row.displayTitle}</span>
+                  <span className={css.rowTitle}>{labelOf(row, t)}</span>
                 </button>
               </li>
             ))}

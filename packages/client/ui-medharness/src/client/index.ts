@@ -22,6 +22,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard kit the column seat receives.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+// Type-only: pulls the Conversation service that owns session-authorized image reads.
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the right Sidebar's  seat declaration.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 // Type-only: the two projection-key declarations the column reads.
@@ -31,6 +33,7 @@ import { en, zh } from './locales.ts'
 import { MedharnessIntake } from './MedharnessIntake.tsx'
 import { MedharnessSidebar } from './MedharnessSidebar.tsx'
 import type { MedharnessSidebarInjected } from './MedharnessSidebar.tsx'
+import type { MedharnessImageLoader, MedharnessImageRef } from './slots.ts'
 
 export type { MedharnessKey } from './locales.ts'
 export type { PatientReportProps } from './PatientReport.tsx'
@@ -54,7 +57,7 @@ const NS = 'medharness'
 const SHELL_PRIORITY = -1
 
 /** Required browser services: the slot registry and copy. */
-export const inject = ['slots', 'locale', 'sessions']
+export const inject = ['slots', 'locale', 'sessions', 'uiConversation']
 
 /**
  * Client plugin body: take the frame's right column for the intake record.
@@ -70,6 +73,16 @@ export function apply(ctx: ClientContext): void {
     name: 'rightbar.session',
     priority: SHELL_PRIORITY,
     locale: NS,
+    inject: (): { loadImage: MedharnessImageLoader } => ({
+      // The same read the conversation's image bubbles use: authorization,
+      // caching, and URL lifetime stay in the Conversation service. The
+      // adapter widens the wire facts back into the branded reference the
+      // service takes, which is the one place both vocabularies are in scope.
+      loadImage: (ref: MedharnessImageRef) => ctx.uiConversation.imageUrl(
+        ctx.sessions.list.getSnapshot().current as SessionId,
+        ref as unknown as Parameters<typeof ctx.uiConversation.imageUrl>[1],
+      ),
+    }),
   }, MedharnessIntake)), 'ui-medharness: intake column')
 
   // The navigation column, replaced outright. Workspaces, files, terminals,

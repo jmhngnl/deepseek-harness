@@ -186,3 +186,37 @@ describe('the intake navigation column', () => {
     expect(screen.getByTestId('medharness-sidebar').textContent).toBe('M')
   })
 })
+
+describe('intake labels', () => {
+  it('never shows a raw session id as the name', () => {
+    // The host's displayTitle falls back to the id when nothing else exists.
+    // An identifier is not a name, so the column says the intake is unnamed.
+    const { props } = face({ ids: ['session-5481fe7b'], byId: { 'session-5481fe7b': row('session-5481fe7b', 'session-5481fe7b', 1) } })
+    render(<MedharnessSidebar {...props} />)
+    const label = screen.getByTestId('intake-row').textContent ?? ''
+    expect(label).toContain('未命名接诊')
+    expect(label).not.toContain('session-5481fe7b')
+  })
+
+  it('prefers the title projection the host derived from the first prompt', () => {
+    const titled = { ...row('s1', 'session-s1', 1), projectionValues: { title: '我头疼两天' } }
+    const { props } = face({ ids: ['s1'], byId: { s1: titled } })
+    render(<MedharnessSidebar {...props} />)
+    expect(screen.getByTestId('intake-row').textContent).toContain('我头疼两天')
+  })
+
+  it('falls back to displayTitle when no title projection has landed', () => {
+    const { props } = face({ ids: ['s1'], byId: { s1: row('s1', 'deepseek-harness', 1) } })
+    render(<MedharnessSidebar {...props} />)
+    expect(screen.getByTestId('intake-row').textContent).toContain('deepseek-harness')
+  })
+
+  it('says it is unnamed when the projection is present but empty', () => {
+    // The host's own fallback: displayTitle IS the session id here, which is
+    // exactly the case the column must not pass through.
+    const blank = { ...row('s1', 's1', 1), projectionValues: { title: '   ' } }
+    const { props } = face({ ids: ['s1'], byId: { s1: blank } })
+    render(<MedharnessSidebar {...props} />)
+    expect(screen.getByTestId('intake-row').textContent).toContain('未命名接诊')
+  })
+})

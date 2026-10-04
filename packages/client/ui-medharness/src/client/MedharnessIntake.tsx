@@ -18,20 +18,24 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-medical-case/client'
 import type {} from '@deepseek-ai/dsh-medical-image/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { MedharnessImageLoader } from './slots.ts'
 import type {} from './locales.ts'
 import { ImageObservations } from './ImageObservations.tsx'
 import { PatientReport } from './PatientReport.tsx'
 import css from './MedharnessShell.module.css'
 
 /** The intake content's props: the shell's session seat plus copy. */
-export type MedharnessIntakeProps = PropsRuntime<'rightbar.session'> & PropsLocale<'medharness'>
+export type MedharnessIntakeProps =
+  & PropsRuntime<'rightbar.session'>
+  & PropsLocale<'medharness'>
+  & { /** Session-authorized image URL resolution, injected by the plugin body. */ readonly loadImage: MedharnessImageLoader }
 
 /**
  * Draw the patient report and the image observations for the current session.
  * @param props - the session seat plus the injected locale seat.
  * @returns the two panels.
  */
-export function MedharnessIntake({ useProjection, t }: MedharnessIntakeProps) {
+export function MedharnessIntake({ useProjection, loadImage, t }: MedharnessIntakeProps) {
   const reported = useProjection('medicalCase')
   const observed = useProjection('medicalImage')
 
@@ -50,7 +54,7 @@ export function MedharnessIntake({ useProjection, t }: MedharnessIntakeProps) {
           <h2 className={css.headTitle}>{t('panel.observed.title')}</h2>
           <p className={css.headCaption}>{t('panel.observed.caption')}</p>
         </header>
-        <ImageObservations view={observed} t={t} />
+        <ImageObservations view={observed} loadImage={loadImage} t={t} />
       </section>
     </>
   )

@@ -10,7 +10,7 @@
  * adding, merging, or inventing anything.
  */
 import { cleanup, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { MedicalCaseWireView } from '@deepseek-ai/dsh-medical-case/client'
 import type { MedicalImageWireView } from '@deepseek-ai/dsh-medical-image/client'
@@ -22,9 +22,13 @@ import { zh } from '../src/client/locales.ts'
 
 const t = makeTranslate(zh)
 
+/** A loader that resolves nothing: the cases that do not draw a thumbnail stay silent. */
+const noImage = () => Promise.reject(new Error('no bytes in this case'))
+
+
 // The column seat is framework-injected and never touched here, so one
 // documented cast keeps the harness to the props these cases exercise.
-const seat = {} as unknown as MedharnessIntakeProps
+const seat = { loadImage: noImage } as unknown as MedharnessIntakeProps
 
 // The suite runs without globals, so testing-library's automatic cleanup is not
 // installed: without this, every render stays in the document and a role query
@@ -64,6 +68,9 @@ const OBSERVED: MedicalImageWireView = {
     attachmentId: 'sha256:aaaa',
     displayName: 'photo.png',
     mediaType: 'image/png',
+    bytes: 4096,
+    width: 800,
+    height: 600,
     revision: 1,
     bodyRegion: '前臂',
     findings: ['红色斑块'],
@@ -120,7 +127,7 @@ describe('patient report', () => {
 
 describe('image observations', () => {
   it('shows what the model saw, with the limits it stated', () => {
-    render(<ImageObservations view={OBSERVED} t={t} />)
+    render(<ImageObservations loadImage={noImage} view={OBSERVED} t={t} />)
 
     const card = screen.getByTestId('image-observation')
     expect(within(card).getByText('photo.png')).toBeTruthy()
@@ -135,14 +142,14 @@ describe('image observations', () => {
     const unusable: MedicalImageWireView = {
       observations: [{ ...OBSERVED.observations[0]!, usable: false, qualityIssues: ['unable_to_assess'] }],
     }
-    render(<ImageObservations view={unusable} t={t} />)
+    render(<ImageObservations loadImage={noImage} view={unusable} t={t} />)
     expect(screen.getByText('无法可靠评估')).toBeTruthy()
   })
 
   it('shows nothing for an attachment that was refused', () => {
     // A refused identifier appends no domain event, so the host publishes an
     // empty list and the page must not fabricate a card for the attempt.
-    render(<ImageObservations view={{ observations: [] }} t={t} />)
+    render(<ImageObservations loadImage={noImage} view={{ observations: [] }} t={t} />)
     expect(screen.queryByTestId('image-observation')).toBeNull()
     expect(screen.getByTestId('image-observations').textContent).toContain('还没有图像观察')
   })
@@ -151,7 +158,7 @@ describe('image observations', () => {
     const unnamed: MedicalImageWireView = {
       observations: [{ ...OBSERVED.observations[0]!, displayName: null }],
     }
-    render(<ImageObservations view={unnamed} t={t} />)
+    render(<ImageObservations loadImage={noImage} view={unnamed} t={t} />)
     expect(screen.getByText('图片 1')).toBeTruthy()
   })
 })
@@ -204,5 +211,37 @@ describe('the intake surface', () => {
   it('shows a plain loading line while a projection value has not arrived', () => {
     render(<MedharnessIntake {...seat} useProjection={useProjectionOf({})} t={t} />)
     expect(screen.getAllByText('正在读取…')).toHaveLength(2)
+  })
+})
+
+describe('image thumbnails', () => {
+  it('draws the image through the injected session-authorized loader', async () => {
+    const loadImage = vi.fn(async () => 'blob:authorized-url')
+    render(<ImageObservations loadImage={loadImage} view={OBSERVED} t={t} />)
+
+    await vi.waitFor(() => { expect(screen.getByRole('img')).toBeTruthy() })
+    const img = screen.getByRole('img')
+    expect(img.getAttribute('src')).toBe('blob:authorized-url')
+    // The loader receives exactly the wire facts, so the surface never has to
+    // know how the attachment package addresses a durable image.
+    expect(loadImage).toHaveBeenCalledWith({
+      attachmentId: 'sha256:aaaa', mediaType: 'image/png', bytes: 4096, width: 800, height: 600,
+    })
+  })
+
+  it('keeps the observation when the bytes are unreachable', async () => {
+    // A refused read is not an error state: what the model recorded is still
+    // true, so the card keeps its name and its findings.
+    render(<ImageObservations loadImage={noImage} view={OBSERVED} t={t} />)
+    await vi.waitFor(() => { expect(screen.getByTestId('image-observation')).toBeTruthy() })
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.getByText('photo.png')).toBeTruthy()
+    expect(screen.getByText('红色斑块')).toBeTruthy()
+  })
+
+  it('never asks for an image the session has no observation for', () => {
+    const loadImage = vi.fn(async () => 'blob:x')
+    render(<ImageObservations loadImage={loadImage} view={{ observations: [] }} t={t} />)
+    expect(loadImage).not.toHaveBeenCalled()
   })
 })

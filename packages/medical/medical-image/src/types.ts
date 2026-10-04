@@ -150,6 +150,11 @@ export interface MedicalImageProjectionState {
  * without one — the UI falls back to its own positional label rather than
  * inventing a filename.
  *
+ * The intrinsic facts (`bytes`, `width`, `height`) are published so the browser
+ * can address the image through the existing session-authorized attachment
+ * read: that seam takes the full reference, and a renderer must not fabricate
+ * one. They describe the file, not the patient.
+ *
  * `usable` and `qualityIssues` are flattened from {@link ImageQuality} because a
  * wire value should not make a renderer unpack a nested shape for two fields
  * that are always read together.
@@ -161,6 +166,12 @@ export interface MedicalImageWireObservation {
   readonly displayName: string | null
   /** Admitted media type, for choosing a thumbnail renderer. */
   readonly mediaType: string
+  /** Exact encoded byte length, as admitted. */
+  readonly bytes: number
+  /** Intrinsic encoded width in pixels, as admitted. */
+  readonly width: number
+  /** Intrinsic encoded height in pixels, as admitted. */
+  readonly height: number
   /** Positive revision; 1 on the first observation of this attachment. */
   readonly revision: number
   /** The body region the image depicts, or null when none was stated. */
