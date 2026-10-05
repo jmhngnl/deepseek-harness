@@ -16,7 +16,7 @@
  * @module @deepseek-ai/dsh-llm-scripted
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { LlmAdapter, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, ToolCallId, visitImageBlocks } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions, LlmResolvedModelInfo, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
@@ -51,6 +51,74 @@ export const name = 'llm-scripted'
 /** The runtime this adapter needs. */
 export const inject = ['llm']
 
+/**
+ * The one request-derived token this adapter understands.
+ *
+ * A script is data, so it cannot call the request. This token is the whole
+ * bridge: a value that IS this string is replaced by the canonical attachment
+ * id of the newest image in the request. Nothing about it is medical — it names
+ * an attachment, and a tool that takes an attachment id is not necessarily a
+ * medical one.
+ */
+export const LATEST_IMAGE_ATTACHMENT_ID = '$latestImageAttachmentId'
+
+/**
+ * The newest image occurrence across a request, or undefined when there is none.
+ *
+ * Read through the shared visitor rather than by walking the block union here:
+ * it already knows that images can sit inside tool results, and a second
+ * traversal would be a second place for that knowledge to live.
+ * @param options - the request being answered.
+ * @returns the canonical attachment id, or undefined.
+ */
+function latestImageAttachmentId(options: GenerateOptions): string | undefined {
+  let latest: string | undefined
+  for (const message of options.messages) {
+    visitImageBlocks(message.content, (block) => {
+      latest = String(block.attachment.attachmentId)
+    })
+  }
+  return latest
+}
+
+/**
+ * Replace every value that IS the token, anywhere in the arguments.
+ *
+ * Exact match only: a value that merely contains the token is left alone, so
+ * the substitution can never quietly rewrite a string somebody meant literally.
+ * Object keys are never touched.
+ * @param value - the scripted argument value.
+ * @param resolved - the attachment id to substitute, or undefined when the
+ *   request carries no image.
+ * @returns the value with the token replaced.
+ * @throws when the token is present and there is nothing to substitute.
+ */
+function substitute(value: unknown, resolved: string | undefined): unknown {
+  if (value === LATEST_IMAGE_ATTACHMENT_ID) {
+    if (resolved === undefined) {
+      throw new Error(
+        `llm-scripted: ${LATEST_IMAGE_ATTACHMENT_ID} requires an image block in the request`,
+      )
+    }
+    return resolved
+  }
+  if (Array.isArray(value)) return value.map(entry => substitute(entry, resolved))
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(value)) out[key] = substitute(entry, resolved)
+    return out
+  }
+  return value
+}
+
+/** Substitute the request-derived tokens in one scripted call's arguments. */
+function resolveArgs(args: Record<string, unknown>, options: GenerateOptions): Record<string, unknown> {
+  // The request is only read when a token is actually present, so a script that
+  // uses none behaves exactly as it did before this existed.
+  const needsImage = JSON.stringify(args).includes(LATEST_IMAGE_ATTACHMENT_ID)
+  const resolved = needsImage ? latestImageAttachmentId(options) : undefined
+  return substitute(args, resolved) as Record<string, unknown>
+}
 /** Stream one line of text, then stop. */
 function textChunks(text: string): StreamChunk[] {
   return [
@@ -150,7 +218,7 @@ export class ScriptedAdapter extends LlmAdapter {
     }
     const chunks = 'text' in step
       ? textChunks(step.text)
-      : toolChunks(`scripted-${this.requests.length}`, step.tool, step.args, step.text)
+      : toolChunks(`scripted-${this.requests.length}`, step.tool, resolveArgs(step.args, options), step.text)
     for (const chunk of chunks) {
       if (options.signal?.aborted) throw new Error('aborted')
       yield chunk

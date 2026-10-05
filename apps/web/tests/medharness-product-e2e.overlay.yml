@@ -27,6 +27,10 @@
       name: '@deepseek-ai/dsh-tool-medical-case-intake'
     - id: tool-medical-case-update
       name: '@deepseek-ai/dsh-tool-medical-case-update'
+    # The image tool the third turn drives. Its schema is what validates the
+    # substituted attachment id, so the id is checked by the real contract.
+    - id: tool-medical-image-observe
+      name: '@deepseek-ai/dsh-tool-medical-image-observe'
 
     # ── The product surface ─────────────────────────────────────────────────
     - id: ui-medharness
@@ -56,3 +60,23 @@
               age: 25
           # Continuation after the real tool result.
           - text: 已记录，谢谢您。
+
+          # ── Turn 3: the person attaches an image ──────────────────────────
+          #
+          # The attachment id is not written here. The adapter substitutes the
+          # canonical id of the newest image in the REQUEST, which is the one the
+          # browser uploaded — so the script states a decision, not an identity,
+          # and cannot go stale if the fixture changes.
+          - tool: medical_image_observe
+            args:
+              attachmentId: $latestImageAttachmentId
+              bodyRegion: 左前臂
+              findings:
+                - 可见局部红色斑片
+                - 表面轻微隆起
+              usable: true
+              qualityIssues: []
+              uncertainty:
+                - 单张二维图像无法判断深度
+          # Continuation after the real tool result.
+          - text: 已记录这张图片中的可见信息。

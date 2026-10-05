@@ -101,3 +101,70 @@ describe('llm-scripted plugin', () => {
     await fiber.dispose()
   })
 })
+
+/** A request carrying the given image attachment ids, in message order. */
+function requestWithImages(...ids: string[]): GenerateOptions {
+  return {
+    messages: [{ role: 'user', content: ids.map(id => ({
+      type: 'image',
+      attachment: { attachmentId: id, mediaType: 'image/png', bytes: 1, width: 1, height: 1 },
+    })) }],
+    signal: undefined,
+  } as unknown as GenerateOptions
+}
+
+/** The arguments of the first tool call in a drained stream. */
+function callArgs(chunks: StreamChunk[]): Record<string, unknown> {
+  const block = chunks.find(chunk => chunk.type === 'block-end') as { block: { arguments: string } }
+  return JSON.parse(block.block.arguments) as Record<string, unknown>
+}
+
+describe('request-derived attachment ids', () => {
+  const TOKEN = '$latestImageAttachmentId'
+
+  it('replaces a top-level value that is exactly the token', async () => {
+    const adapter = new ScriptedAdapter({ ...CONFIG, steps: [{ tool: 't', args: { attachmentId: TOKEN } }] })
+    const args = callArgs(await collect(adapter.stream(requestWithImages('sha256:aaa'))))
+    expect(args).toEqual({ attachmentId: 'sha256:aaa' })
+  })
+
+  it('replaces the token nested in objects and arrays', async () => {
+    const adapter = new ScriptedAdapter({
+      ...CONFIG,
+      steps: [{ tool: 't', args: { outer: { id: TOKEN }, list: [1, TOKEN, 'kept'] } }],
+    })
+    const args = callArgs(await collect(adapter.stream(requestWithImages('sha256:bbb'))))
+    expect(args).toEqual({ outer: { id: 'sha256:bbb' }, list: [1, 'sha256:bbb', 'kept'] })
+  })
+
+  it('takes the LAST image when the request carries several', async () => {
+    const adapter = new ScriptedAdapter({ ...CONFIG, steps: [{ tool: 't', args: { attachmentId: TOKEN } }] })
+    const args = callArgs(await collect(adapter.stream(requestWithImages('sha256:first', 'sha256:last'))))
+    expect(args).toEqual({ attachmentId: 'sha256:last' })
+  })
+
+  it('fails loudly when the token is present and no image is', async () => {
+    const adapter = new ScriptedAdapter({ ...CONFIG, steps: [{ tool: 't', args: { attachmentId: TOKEN } }] })
+    // An empty string or a null would let the tool be called with a value that
+    // was never an attachment, and the domain would reject it for the wrong
+    // reason. The script is wrong; say so.
+    await expect(collect(adapter.stream(options()))).rejects.toThrow(/requires an image block/)
+  })
+
+  it('does not rewrite a string that merely contains the token', async () => {
+    const adapter = new ScriptedAdapter({
+      ...CONFIG,
+      steps: [{ tool: 't', args: { note: `prefix-${TOKEN}` } }],
+    })
+    const args = callArgs(await collect(adapter.stream(requestWithImages('sha256:ccc'))))
+    expect(args).toEqual({ note: `prefix-${TOKEN}` })
+  })
+
+  it('leaves arguments without the token byte-for-byte alone', async () => {
+    const args = { symptoms: ['头疼'], duration: '两天' }
+    const adapter = new ScriptedAdapter({ ...CONFIG, steps: [{ tool: 't', args }] })
+    // No image in the request either: a script that never mentions the token
+    // must not start requiring one.
+    expect(callArgs(await collect(adapter.stream(options())))).toEqual(args)
+  })
+})
