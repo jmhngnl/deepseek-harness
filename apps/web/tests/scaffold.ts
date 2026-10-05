@@ -309,6 +309,13 @@ export interface LaunchOptions {
    */
   extraInstallAnchors?: string[]
   /**
+   * Persistence root to boot against. Omit to get a fresh temp directory, which
+   * is what every scenario that starts from nothing wants. Supply one to open
+   * the SAME durable session store a previous launch wrote — the root then
+   * belongs to the caller, and this scaffold will not remove it on dispose.
+   */
+  persistenceRoot?: string
+  /**
    * Replay fixture (session.jsonl) served by the inserted dsh-llm-replay row
    * in replay/refresh modes; ignored in record mode (the real adapter
    * answers). Omit for scenarios issuing no model calls — a stray stream then
@@ -416,12 +423,27 @@ export interface LaunchOptions {
   harnessHome?: string
 }
 
-/** Dispose the booted tree and remove both owned temp roots, reporting every independent cleanup failure. */
-async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, persistenceRoot: string): Promise<unknown[]> {
+/**
+ * Dispose the booted tree and remove the temp roots this scaffold owns,
+ * reporting every independent cleanup failure.
+ *
+ * `persistenceRoot` is optional on purpose: when the caller supplied the root,
+ * it belongs to the caller. Removing it here would delete the very directory a
+ * second launch is about to reopen, so a cold-restart scenario would fail for a
+ * reason that has nothing to do with the behavior it is testing.
+ * @param ctx - the booted context to dispose.
+ * @param workspaceCwd - the scaffold-owned workspace root.
+ * @param persistenceRoot - the scaffold-owned persistence root, or undefined
+ *   when the caller owns it.
+ * @returns every cleanup failure, so a caller can aggregate rather than lose them.
+ */
+async function cleanupScaffoldWorld(ctx: Context, workspaceCwd: string, persistenceRoot: string | undefined): Promise<unknown[]> {
   const failures: unknown[] = []
   await Promise.resolve(ctx.fiber.dispose()).catch((error: unknown) => failures.push(error))
   await rm(workspaceCwd, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
-  await rm(persistenceRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+  if (persistenceRoot !== undefined) {
+    await rm(persistenceRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+  }
   return failures
 }
 
@@ -497,9 +519,13 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   }
   Object.assign(process.env, skillRootEnvironment)
+  // Undefined means "this scaffold owns the root and must remove it"; a
+  // caller-supplied root stays the caller's, which is what makes a second
+  // launch able to reopen the first one's sessions.
+  const ownedPersistenceRoot = options.persistenceRoot === undefined
   let persistenceRoot: string
   try {
-    persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-sessions-'))
+    persistenceRoot = options.persistenceRoot ?? await mkdtemp(join(tmpdir(), 'dsh-web-e2e-sessions-'))
   } catch (error) {
     const failures: unknown[] = [error]
     await rm(workspaceCwd, { recursive: true, force: true }).catch((cleanupError: unknown) => failures.push(cleanupError))
@@ -681,6 +707,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       // Reproduce that link so a private bundle can import its own plugin.
       const installedLink = join(profileDir, 'node_modules', manifest.name)
       await mkdir(dirname(installedLink), { recursive: true })
+      // Idempotent: a caller-supplied harness home can be booted twice, and the
+      // link a previous launch made is the same link this one wants. Replacing
+      // it is right rather than merely safe — the source directory is what
+      // matters, and it may have moved between runs.
+      await rm(installedLink, { recursive: true, force: true })
       await symlink(packageDir, installedLink, 'junction')
       return {
         packageName: manifest.name,
@@ -816,7 +847,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     }
   } catch (error) {
     if (process.cwd() !== originalCwd) process.chdir(originalCwd)
-    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot)
+    const cleanupFailures = await cleanupScaffoldWorld(ctx, workspaceCwd, ownedPersistenceRoot ? persistenceRoot : undefined)
     restoreCredentialEnvironment()
     restoreSkillRootEnvironment()
     if (cleanupFailures.length > 0) {
@@ -889,7 +920,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       }
       try {
         stopObservingSessions()
-        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, persistenceRoot))
+        failures.push(...await cleanupScaffoldWorld(ctx, workspaceCwd, ownedPersistenceRoot ? persistenceRoot : undefined))
       } finally {
         restoreCredentialEnvironment()
         restoreSkillRootEnvironment()

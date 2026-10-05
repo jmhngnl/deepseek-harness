@@ -14,6 +14,7 @@
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/medharness-diagnostics.ts",
     "apps/web/tests/medharness-product-e2e.e2e.ts",
+    "apps/web/tests/medharness-cold-restart.e2e.ts",
     "apps/web/tests/auto-review-fixture.ts",
     "apps/web/tests/auto-review-denial.e2e.ts",
     "apps/web/tests/scaffold-generation.spec.ts",
